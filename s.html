@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vòng Quay May Mắn Âm Nhạc Lớp 6 (AI Nâng Cấp)</title>
+    <!-- Tải Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Tải Tone.js để tạo âm thanh cho trò chơi -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.min.js"></script>
+    <style>
+        /* Thiết lập font Inter */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+            transition: background-color 0.2s ease;
+        }
+
+        /* Styling cho Vòng Quay - Đã tăng kích thước lên 500px */
+        .wheel-container {
+            position: relative;
+            width: 500px; 
+            height: 500px; 
+            margin: 0 auto;
+        }
+
+        #wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            border: 8px solid #3b82f6;
+            transition: transform 5s cubic-bezier(0.25, 0.1, 0, 1.0); /* Animation mượt mà hơn */
+            position: relative;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+
+        .segment {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 50%;
+            height: 50%;
+            transform-origin: 0% 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px; /* Đã tăng cỡ chữ */
+            font-weight: bold;
+            color: white;
+            text-align: center;
+            padding-top: 20px;
+            box-sizing: border-box;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+        }
+
+        .pointer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -100%);
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-top: 20px solid #ef4444; /* Màu đỏ nổi bật */
+            z-index: 10;
+        }
+
+        /* Modal styling */
+        .modal {
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(5px);
+        }
+
+        .question-box {
+            animation: fadeInScale 0.3s ease-out;
+        }
+
+        @keyframes fadeInScale {
+            from {
+                opacity: 0;
+                transform: translate(-50%, -50%) scale(0.8);
+            }
+            to {
+                opacity: 1;
+                transform: translate(-50%, -50%) scale(1);
+            }
+        }
+        
+        /* --- HIỆU ỨNG THỊ GIÁC ĐỘNG --- */
+
+        /* 1. Hiệu ứng Flash khi trả lời Đúng/Sai */
+        .flash-correct {
+            animation: flashGreen 0.2s ease-in-out;
+        }
+        .flash-incorrect {
+            animation: flashRed 0.2s ease-in-out;
+        }
+        @keyframes flashGreen {
+            0% { background-color: #f7f9fb; }
+            50% { background-color: #34d399; } /* Màu xanh lá nổi bật */
+            100% { background-color: #f7f9fb; }
+        }
+        @keyframes flashRed {
+            0% { background-color: #f7f9fb; }
+            50% { background-color: #f87171; } /* Màu đỏ nổi bật */
+            100% { background-color: #f7f9fb; }
+        }
+
+        /* 2. Hiệu ứng Pulse cho Nút Quay */
+        .spin-prepare {
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1.05); }
+            50% { transform: scale(1); }
+        }
+
+        /* Loading Spinner */
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top: 4px solid white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    <script>
+        // --- 1. Dữ liệu Vòng Quay, Điểm, và Câu Hỏi ---
+        
+        const SEGMENTS = [
+            { text: "30 ĐIỂM", value: 30, color: "#10b981", type: "score" },
+            { text: "X2 ĐIỂM", value: 0, color: "#f59e0b", type: "x2" }, 
+            { text: "10 ĐIỂM", value: 10, color: "#3b82f6", type: "score" },
+            { text: "MẤT LƯỢT", value: 0, color: "#ef4444", type: "miss" },
+            { text: "20 ĐIỂM", value: 20, color: "#06b6d4", type: "score" },
+            { text: "Ô PHẠT", value: 0, color: "#7c3aed", type: "penalty" }, 
+            { text: "20 ĐIỂM", value: 20, color: "#10b981", type: "score" },
+            { text: "CHUYỂN TIẾP", value: 0, color: "#f43f5e", type: "transfer" }
+        ];
+
+        // Mảng câu hỏi trắc nghiệm Âm nhạc 6 (Ngân hàng cố định)
+        const QUESTIONS = [
+            {
+                q: "Bài hát nào là một điệu dân ca của nước Anh?",
+                options: ["Lí cây bông", "Tiếng chuông Ngân", "Amazing Grace", "Lên Ngàn"],
+                answer: "Tiếng chuông Ngân",
+                topic: "Học hát"
+            },
+            {
+                q: "Nhạc cụ nào thuộc bộ gõ, thường dùng trong dàn nhạc giao hưởng?",
+                options: ["Sáo trúc", "Đàn bầu", "Kèn trumpet", "Trống định âm (Timpani)"],
+                answer: "Trống định âm (Timpani)",
+                topic: "Nhạc cụ"
+            },
+            {
+                q: "Kí hiệu nào sau đây chỉ độ to của âm thanh (dynamic)?",
+                options: ["Andante", "mf (mezzo forte)", "C (chung)", "4/4 (số nhịp)"],
+                answer: "mf (mezzo forte)",
+                topic: "Lý thuyết"
+            },
+            {
+                q: "Bài hát 'Em là bông hồng nhỏ' do nhạc sĩ nào sáng tác?",
+                options: ["Trịnh Công Sơn", "Thanh Sơn", "Trần Lập", "Trịnh Công Sơn"],
+                answer: "Trần Lập",
+                topic: "Học hát"
+            }
+        ];
+
+        // Mảng câu hỏi phụ (chủ yếu dùng cho Ô PHẠT)
+        const PENALTY_QUESTIONS = [
+            {
+                q: "Kí hiệu 'p' trong âm nhạc có nghĩa là gì?",
+                options: ["Hát to", "Hát rất nhẹ (Piano)", "Hát vừa phải", "Hát nhanh"],
+                answer: "Hát rất nhẹ (Piano)"
+            },
+            {
+                q: "Trong nhịp 3/4, mỗi ô nhịp có mấy phách?",
+                options: ["2", "3", "4", "6"],
+                answer: "3"
+            }
+        ];
+        
+        // --- TONE.JS AUDIO CONTROLLER SETUP ---
+        const AudioController = {
+            isInitialized: false,
+            mainSynth: null,
+            metalSynth: null,
+            noiseSynth: null,
+            
+            async init() {
+                if (this.isInitialized) return;
+                try {
+                    // Cần gọi Tone.start() sau khi có tương tác người dùng
+                    await Tone.start();
+                    this.isInitialized = true;
+
+                    this.mainSynth = new Tone.Synth({
+                        oscillator: { type: "triangle" },
+                        envelope: { attack: 0.005, decay: 0.2, sustain: 0.1, release: 0.5 },
+                    }).toDestination();
+                    
+                    this.metalSynth = new Tone.MetalSynth({
+                        frequency: 200, 
+                        envelope: { attack: 0.001, decay: 1.0, release: 0.2 },
+                        harmonicity: 5.1,
+                        modulationIndex: 32,
+                        resonance: 4000,
+                        octaves: 1.5
+                    }).toDestination();
+
+                    this.noiseSynth = new Tone.NoiseSynth({
+                        noise: { type: "white" },
+                        envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.5 }
+                    }).toDestination();
+
+                } catch (error) {
+                    console.error("Lỗi khởi tạo Audio Context:", error);
+                }
+            },
+
+            playSpinStart() {
+                if (!this.isInitialized) return;
+                const notes = ["C4", "E4", "G4", "C5"];
+                notes.forEach((note, index) => {
+                    this.mainSynth.triggerAttackRelease(note, "8n", Tone.now() + index * 0.1, 0.5);
+                });
+            },
+
+            playResultChime() {
+                if (!this.isInitialized) return;
+                this.metalSynth.triggerAttackRelease("G4", 0.5);
+            },
+
+            playCorrect() {
+                if (!this.isInitialized) return;
+                const notes = ["E5", "G5", "C6"];
+                const now = Tone.now();
+                
+                notes.forEach((note, index) => {
+                    this.mainSynth.triggerAttackRelease(note, "4n", now + index * 0.05);
+                });
+            },
+
+            playIncorrect() {
+                if (!this.isInitialized) return;
+                this.noiseSynth.triggerAttackRelease(0.5);
+                this.mainSynth.triggerAttackRelease("C3", "8n", "+0.1");
+            }
+        };
+        // --- END TONE.JS AUDIO CONTROLLER SETUP ---
+        
+        // --- 2. Biến Trạng Thái và Quản lý Điểm Số ---
+
+        let teams = [
+            { id: 1, name: "Đội A", score: 0, color: "#ef4444" },
+            { id: 2, name: "Đội B", score: 0, color: "#f59e0b" },
+            { id: 3, name: "Đội C", score: 0, color: "#3b82f6" },
+            { id: 4, name: "Đội D", score: 0, color: "#14b8a6" } // Màu xanh ngọc cho Đội D
+        ];
+
+        let isSpinning = false;
+        let currentQuestion = null;
+        let currentSpinResult = null;
+        let currentPlayerIndex = 0; 
+        let timerInterval = null;
+        const TIME_LIMIT = 30; 
+        
+        // Khai báo biến DOM toàn cục
+        let wheel, spinButton, questionModal, questionText, optionsContainer, timerDisplay, feedbackMessage, teamTurnDisplay, leaderboardContainer, currentSegmentDisplay, generateQuestionButton, readQuestionButton;
+
+        // --- 3. LOGIC GEMINI API (Tạo Câu Hỏi, TTS) ---
+
+        const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=";
+        const TTS_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=";
+        // KHÓA API BẮT BUỘC PHẢI LÀ CHUỖI RỖNG
+        const apiKey = ""; 
+
+        // --- TTS Helper Functions ---
+        function writeString(view, offset, string) {
+            for (let i = 0; i < string.length; i++) {
+                view.setUint8(offset + i, string.charCodeAt(i));
+            }
+        }
+        
+        function base64ToArrayBuffer(base64) {
+            const binaryString = atob(base64);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            return bytes.buffer;
+        }
+
+        function pcmToWav(pcm16, sampleRate) {
+            const numChannels = 1;
+            const bitsPerSample = 16;
+            const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
+            const blockAlign = numChannels * (bitsPerSample / 8);
+            
+            // Dữ liệu API trả về là signed PCM 16-bit
+            const dataLength = pcm16.byteLength; 
+            
+            const buffer = new ArrayBuffer(44 + dataLength); 
+            const view = new DataView(buffer);
+
+            // Ghi header RIFF
+            writeString(view, 0, 'RIFF');
+            view.setUint32(4, 36 + dataLength, true); 
+            writeString(view, 8, 'WAVE');
+
+            // Ghi header FMT
+            writeString(view, 12, 'fmt ');
+            view.setUint32(16, 16, true); 
+            view.setUint16(20, 1, true); // Format (1 = PCM)
+            view.setUint16(22, numChannels, true); 
+            view.setUint32(24, sampleRate, true); 
+            view.setUint32(28, byteRate, true); 
+            view.setUint16(32, blockAlign, true); 
+            view.setUint16(34, bitsPerSample, true); 
+
+            // Ghi header DATA
+            writeString(view, 36, 'data');
+            view.setUint32(40, dataLength, true); 
+
+            // Ghi dữ liệu PCM 
+            const pcmView = new Int16Array(buffer, 44);
+            pcmView.set(pcm16);
+
+            return new Blob([buffer], { type: 'audio/wav' });
+        }
+        // --- End TTS Helper Functions ---
+
+        /**
+         * Gọi API Gemini TTS để đọc câu hỏi
+         * @param {string} text - Nội dung câu hỏi cần đọc.
+         */
+        async function readQuestionAloud(text) {
+            // Tạm thời vô hiệu hóa nút trong khi đang đọc
+            const originalText = readQuestionButton.innerHTML;
+            readQuestionButton.disabled = true;
+            readQuestionButton.innerHTML = '<div class="spinner inline-block mr-2"></div> Đang đọc...';
+            
+            // Khởi tạo AudioContext nếu chưa có (sau tương tác người dùng)
+            await AudioController.init(); 
+
+            const ttsPrompt = `Đọc câu hỏi sau đây với giọng giáo viên âm nhạc nhẹ nhàng và rõ ràng: ${text}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: ttsPrompt }] }],
+                generationConfig: {
+                    responseModalities: ["AUDIO"],
+                    speechConfig: {
+                        voiceConfig: {
+                            // Giọng Kore phù hợp cho giọng đọc thông tin/giáo viên
+                            prebuiltVoiceConfig: { voiceName: "Kore" } 
+                        }
+                    }
+                },
+                model: "gemini-2.5-flash-preview-tts"
+            };
+
+            try {
+                const response = await fetch(TTS_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    console.error("Lỗi API TTS HTTP:", response.status, errorBody);
+                    throw new Error(`Lỗi API (${response.status}): Không thể tạo âm thanh. Chi tiết: ${errorBody.substring(0, 50)}...`);
+                }
+                
+                const result = await response.json();
+                const part = result?.candidates?.[0]?.content?.parts?.[0];
+                const audioData = part?.inlineData?.data;
+                const mimeType = part?.inlineData?.mimeType; 
+
+                if (audioData && mimeType && mimeType.startsWith("audio/L16")) {
+                    const rateMatch = mimeType.match(/rate=(\d+)/);
+                    // Mặc định là 24000 nếu không tìm thấy rate
+                    const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+                    
+                    const pcmData = base64ToArrayBuffer(audioData);
+                    const pcm16 = new Int16Array(pcmData);
+                    
+                    const wavBlob = pcmToWav(pcm16, sampleRate);
+                    const audioUrl = URL.createObjectURL(wavBlob);
+                    
+                    const audio = new Audio(audioUrl);
+                    audio.play();
+
+                    audio.onended = () => {
+                        // Kích hoạt lại nút sau khi đọc xong
+                        readQuestionButton.innerHTML = originalText;
+                        readQuestionButton.disabled = false;
+                    };
+                    
+                } else {
+                    console.error("Lỗi dữ liệu TTS. Không tìm thấy audioData hoặc mimeType không hợp lệ.", result);
+                    throw new Error("Dữ liệu audio không hợp lệ hoặc bị thiếu.");
+                }
+
+            } catch (error) {
+                console.error("Lỗi chung trong quá trình TTS:", error);
+                showFeedback(`Lỗi TTS: ${error.message}. Vui lòng thử lại.`);
+            } finally {
+                // Đảm bảo nút được kích hoạt lại nếu có lỗi xảy ra trước khi phát
+                if (readQuestionButton.innerHTML.includes('Đang đọc')) {
+                    readQuestionButton.innerHTML = originalText;
+                    readQuestionButton.disabled = false;
+                }
+            }
+        }
+
+        /**
+         * Gọi API Gemini để sinh ra một câu hỏi trắc nghiệm mới (JSON format).
+         */
+        async function generateNewQuestion() {
+            const originalText = generateQuestionButton.innerHTML;
+            generateQuestionButton.disabled = true;
+            generateQuestionButton.innerHTML = '<div class="spinner inline-block mr-2"></div> Đang tạo...';
+            
+            readQuestionButton.disabled = true;
+            
+            questionText.textContent = "Đang tải câu hỏi mới từ AI. Vui lòng đợi...";
+            optionsContainer.innerHTML = '';
+            
+            const systemPrompt = `Bạn là một giáo viên âm nhạc lớp 6, chuyên về chương trình Sách Cánh Diều. Hãy tạo một câu hỏi trắc nghiệm (4 lựa chọn, 1 đáp án đúng) về Âm nhạc lớp 6, tập trung vào các chủ đề: Học hát, Nhạc lí, Tập đọc nhạc, Âm nhạc thường thức, hoặc Nghe và Đoán/Nghệ sĩ.`;
+            const userQuery = `Tạo một câu hỏi trắc nghiệm về Âm nhạc 6 (Sách Cánh Diều). Hãy chọn ngẫu nhiên một trong các chủ đề sau: Học hát, Nhạc lí, Tập đọc nhạc, Âm nhạc thường thức, hoặc Nghe và Đoán/Nghệ sĩ. Đảm bảo chỉ có một đáp án đúng và định dạng kết quả là JSON.`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            "q": { "type": "STRING", "description": "Câu hỏi trắc nghiệm." },
+                            "options": { 
+                                "type": "ARRAY", 
+                                "description": "Mảng 4 lựa chọn trả lời.", 
+                                "items": { "type": "STRING" } 
+                            },
+                            "answer": { "type": "STRING", "description": "Đáp án đúng phải nằm trong mảng options." },
+                            "topic": { "type": "STRING", "description": "Chủ đề của câu hỏi (ví dụ: Học hát, Lý thuyết, Nhạc cụ)." }
+                        },
+                        required: ["q", "options", "answer"]
+                    }
+                }
+            };
+            
+            try {
+                const response = await fetch(GEMINI_API_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) {
+                     const errorBody = await response.text();
+                     console.error("Lỗi chi tiết API Tạo Câu Hỏi:", response.status, errorBody);
+                     throw new Error(`Lỗi API (${response.status}): ${errorBody.substring(0, 100)}...`);
+                }
+
+
+                const result = await response.json();
+                const jsonText = result.candidates?.[0]?.content?.parts?.[0]?.text;
+
+                if (jsonText) {
+                    const newQuestion = JSON.parse(jsonText);
+                    // Truyền isAIQuestion = true để kích hoạt TTS tự động
+                    showQuestion([newQuestion], false, true); 
+                } else {
+                    throw new Error("Không nhận được nội dung JSON từ AI.");
+                }
+
+            } catch (error) {
+                console.error("Lỗi gọi API Gemini:", error);
+                showFeedback(`Lỗi AI: ${error.message}. Dùng câu hỏi cố định.`);
+                showQuestion(QUESTIONS, false, false); 
+            } finally {
+                generateQuestionButton.innerHTML = originalText;
+                generateQuestionButton.disabled = false;
+                if (currentQuestion) {
+                    // Sau khi tải xong, cho phép người dùng click để đọc lại (nếu cần)
+                    readQuestionButton.disabled = false; 
+                }
+            }
+        }
+
+
+        // --- 4. DOM Elements và Khởi tạo ---
+        
+        function applyDynamicEffect(type) {
+            const body = document.body;
+            body.classList.remove('flash-correct', 'flash-incorrect');
+            
+            if (type === 'correct') {
+                body.classList.add('flash-correct');
+            } else if (type === 'incorrect') {
+                body.classList.add('flash-incorrect');
+            } else if (type === 'start') {
+                spinButton.classList.add('spin-prepare');
+                spinButton.classList.add('transform', 'scale-105'); 
+            } else if (type === 'stop') {
+                spinButton.classList.remove('spin-prepare');
+                spinButton.classList.remove('transform', 'scale-105'); 
+            }
+
+            if (type === 'correct' || type === 'incorrect') {
+                setTimeout(() => {
+                    body.classList.remove('flash-correct', 'flash-incorrect');
+                }, 500);
+            }
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => {
+            wheel = document.getElementById('wheel');
+            spinButton = document.getElementById('spinButton');
+            questionModal = document.getElementById('questionModal');
+            questionText = document.getElementById('questionText');
+            optionsContainer = document.getElementById('optionsContainer');
+            timerDisplay = document.getElementById('timerDisplay');
+            feedbackMessage = document.getElementById('feedbackMessage');
+            teamTurnDisplay = document.getElementById('teamTurn');
+            leaderboardContainer = document.getElementById('leaderboard');
+            currentSegmentDisplay = document.getElementById('currentSegment');
+            generateQuestionButton = document.getElementById('generateQuestionButton');
+            readQuestionButton = document.getElementById('readQuestionButton');
+            
+            drawWheel();
+            updateLeaderboard();
+            updateTurnDisplay();
+            spinButton.addEventListener('click', spinWheel);
+            
+            // Kích hoạt AudioController.init() sau tương tác để đảm bảo AudioContext sẵn sàng
+            generateQuestionButton.addEventListener('click', () => {
+                // Khi người chơi nhấn "Tạo Câu Hỏi Mới", đây là tương tác đầu tiên, an toàn để gọi TTS tự động
+                generateNewQuestion();
+            });
+
+            readQuestionButton.addEventListener('click', () => {
+                if (currentQuestion && currentQuestion.q) {
+                    readQuestionAloud(currentQuestion.q);
+                } else {
+                    showFeedback("Không có câu hỏi nào để đọc!");
+                }
+            });
+        });
+
+        // --- 5. Chức năng Vẽ Vòng Quay ---
+        
+        function drawWheel() {
+            const numSegments = SEGMENTS.length;
+            const anglePerSegment = 360 / numSegments;
+
+            wheel.innerHTML = '';
+
+            SEGMENTS.forEach((segment, index) => {
+                const element = document.createElement('div');
+                element.classList.add('segment');
+                element.style.backgroundColor = segment.color;
+                
+                const rotation = index * anglePerSegment;
+                element.style.transform = `rotate(${rotation}deg) skewY(-${90 - anglePerSegment}deg)`;
+                
+                const label = document.createElement('span');
+                label.textContent = segment.text;
+                label.style.transform = `skewY(${90 - anglePerSegment}deg) rotate(${anglePerSegment / 2}deg)`;
+                label.style.position = 'absolute';
+                label.style.width = '150px'; 
+                
+                if (numSegments === 8) {
+                    label.style.left = '5px'; 
+                }
+                element.appendChild(label);
+                wheel.appendChild(element);
+            });
+        }
+
+        // --- 6. Chức năng Quay Vòng Quay ---
+
+        function spinWheel() {
+            if (isSpinning) return;
+            
+            applyDynamicEffect('start'); 
+            spinButton.textContent = "HÍT THỞ SÂU... SẴN SÀNG!";
+            spinButton.disabled = true;
+
+            setTimeout(() => {
+                applyDynamicEffect('stop'); 
+                spinButton.textContent = "ĐANG QUAY..."; 
+                
+                isSpinning = true;
+                feedbackMessage.textContent = '';
+                
+                AudioController.init(); 
+                AudioController.playSpinStart(); 
+                
+                const minDegrees = 1800; 
+                const maxDegrees = 3600;
+                const randomDegrees = Math.floor(Math.random() * (maxDegrees - minDegrees + 1)) + minDegrees;
+                
+                const numSegments = SEGMENTS.length;
+                const anglePerSegment = 360 / numSegments;
+                const targetSegmentIndex = Math.floor(Math.random() * numSegments);
+                
+                const segmentCenter = targetSegmentIndex * anglePerSegment + (anglePerSegment / 2); 
+                const stopAngle = randomDegrees - (randomDegrees % 360) + (360 - (segmentCenter + 90) % 360);
+                
+                wheel.style.transform = `rotate(${stopAngle}deg)`;
+                
+                setTimeout(() => {
+                    isSpinning = false;
+                    spinButton.textContent = "QUAY NGAY";
+                    handleSpinResult(targetSegmentIndex);
+                    spinButton.disabled = false;
+                }, 5500);
+
+            }, 1000); 
+        }
+
+        // --- 7. Xử lý Kết quả Vòng Quay ---
+
+        function handleSpinResult(index) {
+            currentSpinResult = SEGMENTS[index];
+            currentSegmentDisplay.textContent = `Kết quả: ${currentSpinResult.text}`;
+            
+            AudioController.playResultChime();
+
+            if (currentSpinResult.type === "miss") {
+                showFeedback(`Ô **${currentSpinResult.text}**! Đội ${teams[currentPlayerIndex].name} mất lượt.`);
+                AudioController.playIncorrect(); 
+                moveToNextPlayer();
+            } else if (currentSpinResult.type === "transfer") {
+                 // Dùng custom modal
+                showCustomPrompt("Ô CHUYỂN TIẾP!", `Đội ${teams[currentPlayerIndex].name} muốn chuyển câu hỏi này cho đội nào? (Gõ A, B, C, hoặc D)`, challengeTeam);
+            } else {
+                const isPenalty = currentSpinResult.type === "penalty";
+                // Khi hiển thị câu hỏi, mặc định không phải là AI question
+                showQuestion(isPenalty ? PENALTY_QUESTIONS : QUESTIONS, isPenalty, false);
+            }
+        }
+
+        function challengeTeam(teamInput) {
+            if (!teamInput) {
+                 showFeedback("Bạn đã hủy chuyển câu hỏi. Đội hiện tại tự trả lời.");
+                 showQuestion(QUESTIONS, false, false);
+                 return;
+            }
+
+            const teamInputUpper = teamInput.trim().toUpperCase();
+            // Cập nhật tìm kiếm để bao gồm D
+            const challengedTeam = teams.find(t => t.name.toUpperCase() === `ĐỘI ${teamInputUpper}`);
+            
+            const transferringPlayerIndex = currentPlayerIndex;
+            
+            if (challengedTeam && challengedTeam.id !== teams[transferringPlayerIndex].id) {
+                
+                currentPlayerIndex = teams.findIndex(t => t.id === challengedTeam.id);
+                updateTurnDisplay();
+                
+                showFeedback(`Đội ${teams[transferringPlayerIndex].name} đã chuyển câu hỏi cho Đội **${challengedTeam.name}**!`);
+
+                showQuestion(QUESTIONS, false, false); 
+            } else if (challengedTeam && challengedTeam.id === teams[transferringPlayerIndex].id) {
+                showFeedback("Không thể chuyển cho đội của mình! Đội hiện tại tự trả lời.");
+                showQuestion(QUESTIONS, false, false);
+            } else {
+                showFeedback("Không tìm thấy đội. Đội hiện tại tự trả lời.");
+                showQuestion(QUESTIONS, false, false);
+            }
+        }
+
+        // --- Custom Modal Function (Thay thế cho prompt() và alert()) ---
+        
+        function showCustomPrompt(title, message, callback) {
+            const modal = document.getElementById('customModal');
+            document.getElementById('customModalTitle').textContent = title;
+            document.getElementById('customModalMessage').textContent = message;
+            
+            const input = document.getElementById('customModalInput');
+            input.value = ''; // Reset input
+            input.placeholder = "Nhập A, B, C, hoặc D"; // Cập nhật placeholder
+            
+            document.getElementById('customModalConfirm').onclick = () => {
+                modal.classList.add('hidden');
+                callback(input.value);
+            };
+
+            document.getElementById('customModalCancel').onclick = () => {
+                 modal.classList.add('hidden');
+                 callback(null); // Trả về null khi hủy
+            };
+
+            modal.classList.remove('hidden');
+        }
+
+        // --- 8. Hiển thị Câu Hỏi và Timer ---
+
+        function startQuestionTimer(duration) {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+
+            let timeLeft = duration;
+            timerDisplay.textContent = `Thời gian: ${timeLeft}s`;
+            timerDisplay.classList.remove('text-red-500');
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                timerDisplay.textContent = `Thời gian: ${timeLeft}s`;
+
+                if (timeLeft <= 10) {
+                    timerDisplay.classList.add('text-red-500');
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    timerDisplay.textContent = "HẾT GIỜ!";
+                    checkAnswer(null, currentSpinResult?.type === "penalty"); 
+                }
+            }, 1000);
+        }
+
+        function showQuestion(questionPool, isPenalty, isAIQuestion = false) {
+            if (isAIQuestion) {
+                 currentQuestion = questionPool[0];
+            } else {
+                currentQuestion = questionPool[Math.floor(Math.random() * questionPool.length)];
+            }
+            
+            const segmentText = isPenalty ? "Ô PHẠT (Trừ 10 điểm)" : currentSpinResult.text;
+            questionModal.classList.remove('hidden');
+            
+            let title = isPenalty ? "CÂU HỎI PHỤ - Ô PHẠT" : `CÂU HỎI NHẬN ${segmentText}`;
+            
+            if (isAIQuestion) {
+                title = `CÂU HỎI TẠO TỪ AI (${currentQuestion.topic || 'Không rõ chủ đề'})`;
+                readQuestionButton.disabled = false;
+                
+                // *** LOGIC MỚI: TỰ ĐỘNG PHÁT TTS KHI CÂU HỎI AI XUẤT HIỆN ***
+                setTimeout(() => {
+                    // Chỉ đọc khi có câu hỏi và nó được tạo từ AI (để tận dụng tương tác của nút trước đó)
+                    if (currentQuestion && currentQuestion.q) {
+                        readQuestionAloud(currentQuestion.q);
+                    }
+                }, 300); // Đợi modal hiển thị
+
+            } else {
+                 // Nếu là câu hỏi cố định, không tự động đọc để tiết kiệm API
+                 readQuestionButton.disabled = true;
+            }
+
+            document.getElementById('modalTitle').textContent = title;
+            questionText.textContent = currentQuestion.q;
+            optionsContainer.innerHTML = '';
+            
+            currentQuestion.options.forEach(option => {
+                const button = document.createElement('button');
+                button.textContent = option;
+                button.className = "w-full p-3 mb-2 text-left bg-indigo-100 hover:bg-indigo-200 text-indigo-800 rounded-lg transition duration-150 ease-in-out font-medium";
+                button.onclick = () => checkAnswer(option, isPenalty);
+                optionsContainer.appendChild(button);
+            });
+            
+            startQuestionTimer(TIME_LIMIT);
+        }
+
+        // --- 9. Kiểm Tra Câu Trả Lời và Tính Điểm ---
+
+        function checkAnswer(selectedOption, isPenalty) {
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+            timerDisplay.classList.remove('text-red-500');
+            questionModal.classList.add('hidden');
+            
+            readQuestionButton.disabled = true;
+            
+            const currentTeam = teams[currentPlayerIndex];
+            const isCorrect = selectedOption && selectedOption === currentQuestion.answer;
+            let awardedPoints = 0;
+            
+            const playerIndexAfterAnswer = currentPlayerIndex; 
+
+            if (isPenalty) {
+                if (isCorrect) {
+                    AudioController.playCorrect(); 
+                    applyDynamicEffect('correct');
+                    showFeedback(`Đội ${currentTeam.name}: Đáp án chính xác! Bạn được **miễn trừ** hình phạt.`);
+                } else {
+                    AudioController.playIncorrect(); 
+                    applyDynamicEffect('incorrect');
+                    currentTeam.score = Math.max(0, currentTeam.score - 10);
+                    showFeedback(`Đội ${currentTeam.name}: Sai hoặc Hết giờ! Bị **trừ 10 điểm**. Điểm hiện tại: ${currentTeam.score}.`);
+                }
+            } else {
+                if (currentSpinResult.type === "x2") {
+                    awardedPoints = 40; 
+                } else if (currentSpinResult.type === "score") {
+                    awardedPoints = currentSpinResult.value;
+                } else if (currentSpinResult.type === "transfer") {
+                    // Nếu là ô chuyển tiếp và đội bị chuyển trả lời đúng, họ vẫn nhận 20 điểm
+                    awardedPoints = 20; 
+                }
+
+                if (isCorrect) {
+                    AudioController.playCorrect(); 
+                    applyDynamicEffect('correct');
+                    currentTeam.score += awardedPoints;
+                    showFeedback(`Đội ${currentTeam.name}: **CHÍNH XÁC!** Bạn nhận được **${awardedPoints} điểm**. Điểm hiện tại: ${currentTeam.score}.`);
+                } else {
+                    AudioController.playIncorrect(); 
+                    applyDynamicEffect('incorrect');
+                    showFeedback(`Đội ${currentTeam.name}: Sai hoặc Hết giờ. Đáp án đúng là: **${currentQuestion.answer}**. Mất lượt.`);
+                }
+            }
+            
+            updateLeaderboard();
+            
+            // Xử lý chuyển lượt
+            if (currentSpinResult.type === "transfer") {
+                // Nếu là chuyển tiếp, lượt sẽ được chuyển cho đội tiếp theo sau đội đã trả lời (đội đã chuyển hoặc đội bị chuyển)
+                currentPlayerIndex = (playerIndexAfterAnswer + 1) % teams.length;
+            } else {
+                moveToNextPlayer();
+            }
+        }
+
+        // --- 10. Quản lý Lượt Chơi và Bảng Xếp Hạng (Leaderboard) ---
+
+        function moveToNextPlayer() {
+            // Logic chuyển lượt cho 4 đội (0, 1, 2, 3)
+            currentPlayerIndex = (currentPlayerIndex + 1) % teams.length;
+            updateTurnDisplay();
+        }
+
+        function updateTurnDisplay() {
+            const currentTeam = teams[currentPlayerIndex];
+            teamTurnDisplay.innerHTML = `<span class="px-3 py-1 rounded-full text-white font-bold" style="background-color: ${currentTeam.color};">Lượt: ${currentTeam.name}</span>`;
+            currentSegmentDisplay.textContent = `Kết quả: Chờ Quay...`;
+        }
+
+        function updateLeaderboard() {
+            const sortedTeams = [...teams].sort((a, b) => b.score - a.score);
+            
+            leaderboardContainer.innerHTML = `
+                <h3 class="text-xl font-bold text-gray-700 mb-4 border-b-2 pb-2">Bảng Xếp Hạng (4 Đội)</h3>
+            `;
+            
+            // Hiển thị tất cả 4 đội
+            sortedTeams.forEach((team, index) => {
+                let medal = '';
+                if (index === 0) medal = '🏆';
+                else if (index === 1) medal = '🥈';
+                else if (index === 2) medal = '🥉';
+
+                leaderboardContainer.innerHTML += `
+                    <div class="flex justify-between items-center p-3 mb-2 rounded-lg ${index === 0 ? 'bg-yellow-100 border-yellow-400 border-2 shadow-lg' : 'bg-white shadow-md'}">
+                        <span class="text-lg font-bold flex items-center" style="color: ${team.color};">${medal} ${team.name}</span>
+                        <span class="text-2xl font-extrabold text-gray-800">${team.score}</span>
+                    </div>
+                `;
+            });
+        }
+
+        function showFeedback(message) {
+            feedbackMessage.innerHTML = message;
+            feedbackMessage.classList.remove('hidden', 'opacity-0', 'bg-red-100', 'bg-green-100', 'bg-blue-100');
+            
+            // Tự động chọn màu feedback
+            if (message.includes('Sai') || message.includes('Lỗi') || message.includes('trừ')) {
+                 feedbackMessage.classList.add('bg-red-100', 'text-red-800');
+            } else if (message.includes('CHÍNH XÁC') || message.includes('miễn trừ') || message.includes('nhận')) {
+                 feedbackMessage.classList.add('bg-green-100', 'text-green-800');
+            } else {
+                 feedbackMessage.classList.add('bg-blue-100', 'text-blue-800');
+            }
+            
+            feedbackMessage.classList.add('opacity-100');
+            if (feedbackMessage.dataset.timeout) {
+                clearTimeout(parseInt(feedbackMessage.dataset.timeout));
+            }
+            const timeoutId = setTimeout(() => {
+                feedbackMessage.classList.remove('opacity-100');
+                feedbackMessage.classList.add('opacity-0');
+                setTimeout(() => { feedbackMessage.classList.add('hidden'); }, 300); 
+            }, 5000);
+            feedbackMessage.dataset.timeout = timeoutId;
+        }
+
+    </script>
+</head>
+<body class="p-4 md:p-8 min-h-screen">
+    <div class="max-w-4xl mx-auto">
+        <h1 class="text-4xl font-extrabold text-center text-indigo-700 mb-8 tracking-tight">
+            Vòng Quay May Mắn Âm Nhạc Lớp 6 (AI Nâng Cấp)
+        </h1>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <!-- Cột 1: Vòng Quay -->
+            <div class="md:col-span-2 bg-white p-6 rounded-xl shadow-2xl">
+                <div class="flex justify-between items-center mb-6">
+                    <div id="teamTurn" class="text-lg font-bold"></div>
+                    <div id="currentSegment" class="text-lg font-bold text-gray-600">Kết quả: Chờ Quay...</div>
+                </div>
+
+                <div class="wheel-container">
+                    <div id="wheel" class="bg-gray-200">
+                        <!-- Segments sẽ được vẽ bằng JS -->
+                    </div>
+                    <div class="pointer"></div>
+                </div>
+
+                <button id="spinButton" class="w-full mt-8 py-3 bg-indigo-600 text-white text-xl font-bold rounded-xl hover:bg-indigo-700 transition duration-300 shadow-lg">
+                    <span class="tracking-wider">QUAY NGAY</span>
+                </button>
+                
+            </div>
+            
+            <!-- Cột 2: Bảng Xếp Hạng và Thông Báo -->
+            <div class="md:col-span-1 flex flex-col space-y-6">
+                <div id="leaderboard" class="bg-gray-50 p-6 rounded-xl shadow-xl border border-gray-200">
+                    <!-- Leaderboard sẽ được cập nhật bằng JS -->
+                </div>
+
+                <!-- Hộp thông báo phản hồi -->
+                <div id="feedbackMessage" class="hidden p-4 rounded-xl font-semibold shadow-md transition duration-300 opacity-0">
+                    <!-- Thông báo phản hồi sẽ xuất hiện ở đây -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Hiển thị Câu Hỏi -->
+        <div id="questionModal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+            <div class="question-box bg-white rounded-xl p-8 max-w-lg w-full relative shadow-2xl">
+                <h2 id="modalTitle" class="text-2xl font-bold text-center mb-4 text-indigo-600">CÂU HỎI TRẮC NGHIỆM</h2>
+                <div class="border-t pt-4 mb-4">
+                    <p id="questionText" class="text-xl font-medium text-gray-800 mb-4">Đang tải câu hỏi...</p>
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex space-x-2">
+                            <button id="generateQuestionButton" class="flex items-center justify-center px-3 py-2 bg-pink-500 text-white font-bold text-sm rounded-lg hover:bg-pink-600 transition duration-150 shadow-md whitespace-nowrap">
+                                Tạo Câu Hỏi Mới ✨
+                            </button>
+                            <!-- Nút Nghe Câu Hỏi (TTS) -->
+                            <button id="readQuestionButton" disabled class="flex items-center justify-center px-3 py-2 bg-yellow-500 text-white font-bold text-sm rounded-lg hover:bg-yellow-600 transition duration-150 shadow-md">
+                                🔊 TTS
+                            </button>
+                        </div>
+                        <div id="timerDisplay" class="text-xl font-extrabold">Thời gian: 30s</div>
+                    </div>
+                </div>
+                
+                <div id="optionsContainer" class="mt-4">
+                    <!-- Các nút đáp án sẽ được chèn vào đây -->
+                </div>
+                
+            </div>
+        </div>
+        
+        <!-- Custom Modal cho Ô Chuyển Tiếp (thay thế prompt()) -->
+        <div id="customModal" class="modal fixed inset-0 z-50 flex items-center justify-center p-4 hidden">
+            <div class="bg-white rounded-xl p-6 max-w-sm w-full relative shadow-2xl">
+                <h3 id="customModalTitle" class="text-xl font-bold text-indigo-600 mb-3">Thông báo</h3>
+                <p id="customModalMessage" class="text-gray-700 mb-4">Nội dung thông báo.</p>
+                <input id="customModalInput" type="text" placeholder="Nhập A, B, C, hoặc D" class="w-full p-2 border border-gray-300 rounded-lg mb-4 focus:ring-indigo-500 focus:border-indigo-500">
+                <div class="flex justify-end space-x-3">
+                    <button id="customModalCancel" class="px-4 py-2 bg-gray-300 text-gray-800 font-semibold rounded-lg hover:bg-gray-400 transition">Hủy</button>
+                    <button id="customModalConfirm" class="px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition">Xác nhận</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
