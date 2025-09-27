@@ -1,0 +1,1314 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vòng Quay Chủ Đề Âm Nhạc 7</title>
+    <!-- Tải Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Thiết lập font Inter */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0f4f8; /* Màu nền nhẹ nhàng */
+        }
+        .spin-button {
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.2), 0 10px 20px rgba(0, 0, 0, 0.1);
+        }
+        .spin-button:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 6px 8px rgba(0, 0, 0, 0.3), 0 12px 24px rgba(0, 0, 0, 0.15);
+        }
+        .spin-button:disabled {
+            cursor: not-allowed;
+            opacity: 0.6;
+            box-shadow: none;
+        }
+        /* Style cho kim quay */
+        .pointer {
+            width: 0;
+            height: 0;
+            border-style: solid;
+            border-width: 0 15px 30px 15px;
+            border-color: transparent transparent #dc2626 transparent; /* Màu đỏ */
+            position: absolute;
+            top: -20px; /* Đặt phía trên tâm */
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+        canvas {
+            border-radius: 50%;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.2);
+        }
+    </style>
+</head>
+<body class="p-4 flex flex-col items-center min-h-screen">
+    <!-- Tiêu đề & Nút Cài đặt & Điểm số -->
+    <header class="w-full max-w-lg text-center mb-6 flex justify-between items-start">
+        <!-- Điểm số -->
+        <div class="bg-yellow-400 p-2 rounded-lg shadow-lg font-bold text-lg text-gray-800 border-2 border-yellow-600">
+            Điểm: <span id="currentScore">0</span>
+        </div>
+        <div class="flex-grow mx-4">
+            <h1 class="text-3xl font-extrabold text-blue-700 mt-0 mb-1">Vòng Quay Chủ Đề Âm Nhạc 7</h1>
+            <p class="text-gray-600 text-sm">Quay để chọn Chủ đề ngẫu nhiên</p>
+        </div>
+        <!-- Nút Cài đặt -->
+        <button id="adminButton" class="p-2 bg-gray-200 rounded-full hover:bg-gray-300 transition duration-150" title="Cài đặt câu hỏi và chủ đề">
+            <!-- Icon Cog/Settings using inline SVG -->
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-600">
+                <circle cx="12" cy="12" r="3"></circle>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1.51-1V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09A1.65 1.65 0 0 0 15 4.6a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V12a1.65 1.65 0 0 0 1.51 1h.09a2 2 0 0 1 2 2z"></path>
+            </svg>
+        </button>
+    </header>
+    <!-- Khu vực Vòng Quay -->
+    <div class="relative flex justify-center items-center w-full max-w-sm lg:max-w-md aspect-square mb-8">
+        <canvas id="luckyWheel" class="w-full h-full"></canvas>
+        <div class="pointer"></div>
+        <!-- Vòng tròn tâm -->
+        <div class="absolute w-12 h-12 bg-white rounded-full border-4 border-red-500 shadow-md"></div>
+    </div>
+    <!-- Nút Quay -->
+    <button id="spinButton" class="spin-button bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-full text-xl uppercase tracking-wider disabled:bg-gray-400">
+        Quay Ngay
+    </button>
+    <!-- Hiển thị kết quả / thông báo -->
+    <p id="resultMessage" class="mt-4 text-center font-semibold text-lg text-gray-700 min-h-[30px]"></p>
+    <!-- Loading Message -->
+    <div id="loadingMessage" class="mt-4 text-orange-500 font-semibold hidden">
+        Đang tải dữ liệu và xác thực...
+    </div>
+    <!-- Modal Quiz -->
+    <div id="quizModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-y-auto max-h-[90vh]">
+            <div class="p-6">
+                <h2 id="quizTitle" class="text-2xl font-bold mb-4 text-center text-blue-600"></h2>
+                <p id="questionText" class="text-gray-800 text-lg mb-6 font-medium"></p>
+                <div id="mcOptionsContainer" class="space-y-3">
+                    <!-- Các nút đáp án trắc nghiệm sẽ được chèn vào đây -->
+                </div>
+                <div id="fitbContainer" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Điền đáp án chính xác vào ô dưới đây:</label>
+                    <input type="text" id="fitbAnswerInput" class="w-full rounded-md border-gray-300 shadow-sm p-3 border text-lg focus:border-blue-500 focus:ring-blue-500" placeholder="Nhập câu trả lời của bạn...">
+                    <button id="fitbSubmitButton" class="w-full mt-4 bg-purple-500 hover:bg-purple-600 text-white font-bold py-2 rounded-lg text-lg">
+                        Kiểm Tra
+                    </button>
+                </div>
+                <div id="feedbackBox" class="mt-4 p-3 rounded-lg font-semibold hidden"></div>
+                <button id="nextButton" class="w-full mt-6 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg text-lg hidden">
+                    Hoàn thành
+                </button>
+            </div>
+        </div>
+    </div>
+    <!-- Modal Admin Panel (Cài đặt) -->
+    <div id="adminModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-y-auto max-h-[95vh]">
+            <div class="p-6">
+                <!-- Header của Admin Panel -->
+                <div class="flex justify-between items-center mb-4 border-b pb-2">
+                    <h2 class="text-2xl font-bold text-blue-700">Quản Lý Nội Dung Âm Nhạc</h2>
+                    <!-- Nút Thoát/Đóng Admin Panel -->
+                    <button id="closeAdminButton" class="p-2 bg-red-500 hover:bg-red-600 text-white rounded-lg font-bold text-sm transition duration-150">
+                        Thoát (Đóng)
+                    </button>
+                </div>
+                <!-- Tabs chính -->
+                <div class="flex border-b mb-4">
+                    <button id="tabQuestions" class="py-2 px-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-blue-600 hover:border-blue-300">Quản lý Câu hỏi</button>
+                    <button id="tabTopics" class="py-2 px-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-blue-600 hover:border-blue-300">Quản lý Chủ đề</button>
+                </div>
+                <!-- Tab Content Container -->
+                <div id="tabContent">
+                    <!-- Tab 1: Quản lý Câu hỏi -->
+                    <div id="contentQuestions" class="tab-content hidden">
+                        <!-- Tabs phụ: Thêm thủ công và Nhập hàng loạt -->
+                        <div class="flex border-b mb-4">
+                            <button id="subTabManual" class="py-2 px-4 text-sm font-medium border-b-2 border-blue-600 text-blue-600">Thêm thủ công</button>
+                            <button id="subTabBulk" class="py-2 px-4 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-blue-600 hover:border-blue-300">Nhập hàng loạt</button>
+                        </div>
+                        <!-- 1.1 Nội dung Tab Thêm thủ công -->
+                        <div id="subContentManual" class="sub-tab-content">
+                            <!-- Form Thêm/Chỉnh sửa Câu hỏi (Giữ nguyên) -->
+                            <div class="mb-8 border p-4 rounded-lg bg-gray-50">
+                                <h3 id="formTitle" class="text-xl font-semibold mb-3 text-red-500">Thêm Câu Hỏi Mới</h3>
+                                <form id="questionForm" class="space-y-4">
+                                    <input type="hidden" id="docId" value="">
+                                    <div class="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="topicIdSelect" class="block text-sm font-medium text-gray-700">Chủ đề:</label>
+                                            <select id="topicIdSelect" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border bg-white"></select>
+                                        </div>
+                                        <div>
+                                            <label for="questionTypeSelect" class="block text-sm font-medium text-gray-700">Loại Câu Hỏi:</label>
+                                            <select id="questionTypeSelect" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border bg-white">
+                                                <option value="MC">Trắc nghiệm (Multiple Choice)</option>
+                                                <option value="FITB">Điền vào chỗ trống (Fill-in-the-Blank)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label for="qText" class="block text-sm font-medium text-gray-700">Nội dung Câu hỏi:</label>
+                                        <textarea id="qText" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border"></textarea>
+                                    </div>
+                                    <!-- Input Fields for MC -->
+                                    <div id="optionsInputContainer" class="space-y-3 p-2 border rounded-md">
+                                        <h4 class="font-semibold text-gray-600">Các Lựa Chọn (Đáp án đúng là lựa chọn có dấu <span class="text-red-500">✔</span>)</h4>
+                                        <div class="flex space-x-2"><input type="text" id="opt0" placeholder="Lựa chọn A" class="w-full rounded-md border-gray-300 shadow-sm p-2 border"><label class="flex items-center space-x-1"><input type="radio" name="correctOption" value="0"><span class="text-red-500 font-bold">✔</span></label></div>
+                                        <div class="flex space-x-2"><input type="text" id="opt1" placeholder="Lựa chọn B" class="w-full rounded-md border-gray-300 shadow-sm p-2 border"><label class="flex items-center space-x-1"><input type="radio" name="correctOption" value="1"><span class="text-red-500 font-bold">✔</span></label></div>
+                                        <div class="flex space-x-2"><input type="text" id="opt2" placeholder="Lựa chọn C" class="w-full rounded-md border-gray-300 shadow-sm p-2 border"><label class="flex items-center space-x-1"><input type="radio" name="correctOption" value="2"><span class="text-red-500 font-bold">✔</span></label></div>
+                                        <div class="flex space-x-2"><input type="text" id="opt3" placeholder="Lựa chọn D" class="w-full rounded-md border-gray-300 shadow-sm p-2 border"><label class="flex items-center space-x-1"><input type="radio" name="correctOption" value="3"><span class="text-red-500 font-bold">✔</span></label></div>
+                                    </div>
+                                    <!-- Input Field for FITB -->
+                                    <div id="fitbAnswerInputContainer" class="space-y-3 p-2 border rounded-md hidden">
+                                        <h4 class="font-semibold text-gray-600">Đáp án chính xác (Điền không dấu, không phân biệt hoa/thường để dễ kiểm tra)</h4>
+                                        <input type="text" id="fitbCorrectText" placeholder="Ví dụ: dan ca xoan" class="w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                                    </div>
+                                    <div class="flex justify-between items-center">
+                                        <button type="submit" id="saveQuestionButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150">
+                                            Lưu Câu Hỏi
+                                        </button>
+                                        <button type="button" id="cancelEditButton" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition duration-150 hidden">
+                                            Hủy Bỏ
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                        <!-- 1.2 Nội dung Tab Nhập hàng loạt (MỚI) -->
+                        <div id="subContentBulk" class="sub-tab-content hidden">
+                            <div class="mb-6 p-4 border rounded-lg bg-yellow-50">
+                                <h3 class="text-xl font-semibold mb-3 text-red-600">Hướng Dẫn Nhập Hàng Loạt</h3>
+                                <p class="text-sm text-gray-700 mb-3">Vui lòng dán dữ liệu vào ô dưới đây theo định dạng **JSON Array**. Sử dụng **Tên Chủ đề** (ví dụ: `Dân ca Xoan`) chứ không phải ID của Chủ đề.</p>
+                                <pre class="bg-gray-800 text-white p-3 rounded-md text-xs overflow-x-auto whitespace-pre-wrap"> [
+    {
+        "topicName": "Tên Chủ đề phải tồn tại",
+        "type": "MC", // Hoặc "FITB"
+        "text": "Đây là câu hỏi trắc nghiệm?",
+        "options": ["Lựa chọn A", "Lựa chọn B", "Lựa chọn C", "Lựa chọn D"],
+        "correctIndex": 0 // Chỉ mục (0, 1, 2, hoặc 3) của đáp án đúng trong options
+    },
+    {
+        "topicName": "Tên Chủ đề khác",
+        "type": "FITB",
+        "text": "Điền vào chỗ trống: Việt Nam có bao nhiêu dân tộc?",
+        "correctAnswerText": "54" // Đáp án chính xác cho câu điền trống
+    }
+] </pre>
+                            </div>
+                            <textarea id="bulkDataInput" rows="10" placeholder="Dán dữ liệu JSON Array của bạn vào đây..." class="w-full rounded-md border-gray-300 shadow-sm p-3 border font-mono text-sm"></textarea>
+                            <div id="bulkErrorLog" class="mt-3 p-3 text-sm rounded-lg bg-red-100 text-red-700 hidden"></div>
+                            <button id="importBulkButton" class="w-full mt-4 bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-4 rounded-lg transition duration-150">
+                                Xác Nhận & Nhập Câu Hỏi Hàng Loạt
+                            </button>
+                        </div>
+                        <!-- Danh sách Câu hỏi hiện tại (Giữ nguyên) -->
+                        <h3 class="text-xl font-semibold mb-3 mt-6 text-blue-600">Danh Sách Câu Hỏi Hiện Tại (<span id="questionCount">0</span>)</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STT</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Chủ đề</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Loại</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Câu Hỏi</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Đáp Án</th>
+                                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Thao Tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="questionTableBody" class="bg-white divide-y divide-gray-200">
+                                    <!-- Danh sách câu hỏi sẽ được chèn vào đây -->
+                                </tbody>
+                            </table>
+                            <p id="emptyListMessage" class="text-center p-4 text-gray-500 italic">Chưa có câu hỏi nào được thêm. Hãy thêm câu hỏi đầu tiên!</p>
+                        </div>
+                    </div>
+                    <!-- Tab 2: Quản lý Chủ đề (Giữ nguyên) -->
+                    <div id="contentTopics" class="tab-content hidden">
+                        <!-- Form Thêm/Chỉnh sửa Chủ đề -->
+                        <div class="mb-8 border p-4 rounded-lg bg-gray-50">
+                            <h3 id="topicFormTitle" class="text-xl font-semibold mb-3 text-red-500">Thêm Chủ đề Mới</h3>
+                            <form id="topicForm" class="space-y-4">
+                                <input type="hidden" id="topicDocId" value="">
+                                <div>
+                                    <label for="topicName" class="block text-sm font-medium text-gray-700">Tên Chủ đề (Ví dụ: Nhịp $\frac{2}{4}$, Dân ca Xoan):</label>
+                                    <input type="text" id="topicName" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border">
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <button type="submit" id="saveTopicButton" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg transition duration-150">
+                                        Lưu Chủ đề
+                                    </button>
+                                    <button type="button" id="cancelTopicEditButton" class="bg-gray-400 hover:bg-gray-500 text-white font-bold py-2 px-4 rounded-lg transition duration-150 hidden">
+                                        Hủy Bỏ
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                        <h3 class="text-xl font-semibold mb-3 text-blue-600">Danh Sách Chủ đề Hiện Tại (<span id="topicCount">0</span>)</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-100">
+                                    <tr>
+                                        <th class="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">STT</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tên Chủ đề</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số câu hỏi</th>
+                                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Thao Tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="topicTableBody" class="bg-white divide-y divide-gray-200">
+                                </tbody>
+                            </table>
+                            <p id="emptyTopicListMessage" class="text-center p-4 text-gray-500 italic">Chưa có chủ đề nào được thêm.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- THÊM CÁC BIẾN TOÀN CỤC CHO MÔI TRƯỜNG KHÔNG CÓ CANVAS (LAPTOP) -->
+    <script>
+        // Các biến này thường được cung cấp bởi môi trường Canvas.
+        // Cung cấp giá trị mặc định/placeholder an toàn cho trường hợp chạy cục bộ.
+        // LƯU Ý: Nếu chạy cục bộ, bạn phải đảm bảo cấu hình Firebase bên dưới là CẤU HÌNH THẬT
+        // và đã bật Firestore, cũng như đặt Security Rules phù hợp.
+        if (typeof __app_id === 'undefined') {
+            const __app_id = 'local-music-quiz-app';
+        }
+        if (typeof __firebase_config === 'undefined') {
+            // Đây là cấu hình giả. VUI LÒNG THAY THẾ bằng cấu hình Firebase của bạn
+            // để đảm bảo kết nối thành công khi chạy cục bộ.
+            const __firebase_config = '{}'; 
+        }
+        if (typeof __initial_auth_token === 'undefined') {
+            const __initial_auth_token = null; 
+        }
+    </script>
+    <script type="module">
+        // Import các module Firebase cần thiết
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Bật log Debug cho Firebase
+        setLogLevel('Debug');
+
+        // --- 1. THIẾT LẬP FIREBASE VÀ BIẾN TOÀN CỤC ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        let firebaseConfig = {};
+        try {
+            firebaseConfig = JSON.parse(__firebase_config);
+        } catch (e) {
+            console.error("Lỗi: Không thể phân tích cấu hình Firebase. Sử dụng cấu hình trống.");
+            // Tiếp tục với cấu hình trống để tránh crash, nhưng thông báo cho người dùng
+        }
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        let app, db, auth;
+        let userId = '';
+        let quizData = []; // Mảng chứa dữ liệu câu hỏi
+        let topicData = []; // Mảng chứa dữ liệu chủ đề
+        let currentScore = 0; // Biến tính điểm
+
+        // Khởi tạo AudioContext
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
+        // Đường dẫn đến Collections (Lưu trữ riêng tư cho người dùng hiện tại)
+        const getTopicCollectionPath = (uid) => `/artifacts/${appId}/users/${uid}/quiz_topics`;
+        const getQuestionCollectionPath = (uid) => `/artifacts/${appId}/users/${uid}/quiz_questions`;
+
+        // Khởi tạo Firebase
+        async function initializeFirebase() {
+            try {
+                // 1. Khởi tạo App
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // 2. Xác thực người dùng
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                userId = auth.currentUser?.uid || crypto.randomUUID();
+                console.log("Xác thực thành công. User ID:", userId);
+
+                // 3. Tải dữ liệu câu hỏi và chủ đề
+                loadData();
+                loadingMessage.classList.add('hidden');
+            } catch (error) {
+                console.error("Lỗi khởi tạo Firebase:", error);
+                loadingMessage.textContent = `Lỗi tải dữ liệu. Vui lòng kiểm tra console/cấu hình. Lỗi: ${error.message}`;
+                spinButton.disabled = true;
+            }
+        }
+
+        // --- 2. LOGIC ÂM THANH (WEB AUDIO API) ---
+        /**
+         * Tạo và phát âm thanh đơn giản (sóng vuông)
+         * @param {number} frequency Tần số
+         * @param {number} duration Thời gian (giây)
+         * @param {number} volume Âm lượng (0 đến 1)
+         */
+        function playTone(frequency, duration, volume) {
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.type = 'square';
+            oscillator.frequency.setValueAtTime(frequency, audioContext.currentTime);
+            gainNode.gain.setValueAtTime(volume, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + duration);
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            oscillator.start();
+            oscillator.stop(audioContext.currentTime + duration);
+        }
+
+        function playSpinSound() {
+            // Âm thanh quay (tần số thấp lặp lại nhanh)
+            let time = audioContext.currentTime;
+            for (let i = 0; i < 20; i++) {
+                playTone(100 + i * 5, 0.1, 0.2); // Tăng dần tần số
+                time += 0.1;
+            }
+        }
+
+        function playStopSound() {
+            // Âm thanh dừng (kết thúc cao)
+            playTone(440, 0.2, 0.3);
+            setTimeout(() => playTone(880, 0.3, 0.4), 200);
+        }
+
+        function playCorrectSound() {
+            // Âm thanh đúng (chủ đạo G4)
+            playTone(784, 0.1, 0.5); // G5
+            setTimeout(() => playTone(988, 0.2, 0.5), 100); // B5
+            setTimeout(() => playTone(1175, 0.3, 0.5), 300); // D6
+        }
+
+        function playIncorrectSound() {
+            // Âm thanh sai (giảm dần)
+            playTone(220, 0.2, 0.4); // A3
+            setTimeout(() => playTone(110, 0.3, 0.4), 200); // A2
+        }
+
+        // --- 3. LOGIC TÍNH ĐIỂM ---
+        const currentScoreElement = document.getElementById('currentScore');
+        function updateScore(points) {
+            currentScore += points;
+            currentScoreElement.textContent = currentScore;
+            // Lưu điểm vào localStorage nếu cần, nhưng tạm thời giữ trong session
+        }
+
+        // --- 4. LOGIC TẢI DỮ LIỆU & KIỂM TRA QUAY ---
+        // Hàm kiểm tra khả năng quay và cập nhật trạng thái nút
+        function checkSpinEligibility() {
+            const hasTopics = topicData.length > 0;
+            const hasQuestions = quizData.length > 0;
+            // Kiểm tra xem có ít nhất 1 chủ đề có câu hỏi hay không
+            const topicsWithQuestions = topicData.filter(t => quizData.some(q => q.topicId === t.id));
+            const hasUsableTopics = topicsWithQuestions.length > 0;
+
+            spinButton.disabled = isSpinning || !hasUsableTopics;
+
+            if (topicData.length === 0 || quizData.length === 0) {
+                 spinButton.disabled = true; // Không cho phép quay nếu không có data
+            }
+
+            if (!hasTopics) {
+                resultMessage.textContent = 'Vui lòng thêm Chủ đề qua nút Cài đặt trước.';
+            } else if (!hasQuestions) {
+                resultMessage.textContent = 'Vui lòng thêm câu hỏi vào các Chủ đề đã có.';
+            } else if (!hasUsableTopics) {
+                resultMessage.textContent = 'Các Chủ đề hiện tại chưa có câu hỏi nào. Vui lòng thêm câu hỏi!';
+            } else {
+                resultMessage.textContent = 'Sẵn sàng! Quay để chọn một Chủ đề...';
+            }
+        }
+
+        // Hàm tải dữ liệu câu hỏi và chủ đề
+        function loadData() {
+            // Phải kiểm tra db đã được khởi tạo chưa
+            if (!db) {
+                console.warn("Firestore chưa sẵn sàng. Bỏ qua lắng nghe dữ liệu.");
+                return;
+            }
+
+            const topicPath = getTopicCollectionPath(userId);
+            const questionPath = getQuestionCollectionPath(userId);
+
+            // 1. Lắng nghe Chủ đề (Topics)
+            onSnapshot(query(collection(db, topicPath)), (snapshot) => {
+                topicData = [];
+                snapshot.forEach(doc => {
+                    topicData.push({ id: doc.id, ...doc.data() });
+                });
+                topicData.sort((a, b) => a.name.localeCompare(b.name, 'vi')); // Sắp xếp A-Z
+                renderTopicList();
+                renderQuestionFormDropdown();
+                drawWheel();
+                checkSpinEligibility();
+            }, (error) => console.error("Lỗi khi tải Chủ đề:", error));
+
+            // 2. Lắng nghe Câu hỏi (Questions)
+            onSnapshot(query(collection(db, questionPath)), (snapshot) => {
+                quizData = [];
+                snapshot.forEach(doc => {
+                    quizData.push({ id: doc.id, ...doc.data() });
+                });
+                // Sắp xếp theo thứ tự thêm vào (nếu không có trường q cụ thể)
+                quizData.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+                
+                drawWheel();
+                renderAdminList();
+                renderTopicList(); // Cần cập nhật số câu hỏi trong từng chủ đề
+                checkSpinEligibility();
+            }, (error) => console.error("Lỗi khi tải Câu hỏi:", error));
+        }
+
+        // Hàm lấy đáp án đúng
+        function getCorrectAnswer(question) {
+            // Lấy đáp án cho cả MC và FITB
+            if (question.type === 'MC' && question.options && question.options.length > question.correctIndex) {
+                return question.options[question.correctIndex] || 'N/A (Trắc nghiệm)';
+            }
+            if (question.type === 'FITB' && question.correctAnswerText) {
+                return question.correctAnswerText;
+            }
+            return 'N/A';
+        }
+
+        // --- 5. LOGIC ADMIN PANEL & TABS ---
+        const adminButton = document.getElementById('adminButton');
+        const adminModal = document.getElementById('adminModal');
+        const closeAdminButton = document.getElementById('closeAdminButton');
+        const tabQuestions = document.getElementById('tabQuestions');
+        const tabTopics = document.getElementById('tabTopics');
+        const contentQuestions = document.getElementById('contentQuestions');
+        const contentTopics = document.getElementById('contentTopics');
+        const subTabManual = document.getElementById('subTabManual');
+        const subTabBulk = document.getElementById('subTabBulk');
+        const subContentManual = document.getElementById('subContentManual');
+        const subContentBulk = document.getElementById('subContentBulk');
+
+        function switchTab(target) {
+            // Tabs chính
+            tabQuestions.classList.toggle('border-blue-600', target === 'questions');
+            tabQuestions.classList.toggle('text-blue-600', target === 'questions');
+            tabQuestions.classList.toggle('border-transparent', target !== 'questions');
+            tabQuestions.classList.toggle('text-gray-500', target !== 'questions');
+
+            tabTopics.classList.toggle('border-blue-600', target === 'topics');
+            tabTopics.classList.toggle('text-blue-600', target === 'topics');
+            tabTopics.classList.toggle('border-transparent', target !== 'topics');
+            tabTopics.classList.toggle('text-gray-500', target !== 'topics');
+
+            contentQuestions.classList.toggle('hidden', target !== 'questions');
+            contentTopics.classList.toggle('hidden', target !== 'topics');
+
+            if (target === 'questions') {
+                switchSubTab('manual'); // Mặc định mở sub-tab Thêm thủ công
+            }
+        }
+
+        function switchSubTab(target) {
+            // Tabs phụ trong Quản lý Câu hỏi
+            subTabManual.classList.toggle('border-blue-600', target === 'manual');
+            subTabManual.classList.toggle('text-blue-600', target === 'manual');
+            subTabManual.classList.toggle('border-transparent', target !== 'manual');
+            subTabManual.classList.toggle('text-gray-500', target !== 'manual');
+
+            subTabBulk.classList.toggle('border-blue-600', target === 'bulk');
+            subTabBulk.classList.toggle('text-blue-600', target === 'bulk');
+            subTabBulk.classList.toggle('border-transparent', target !== 'bulk');
+            subTabBulk.classList.toggle('text-gray-500', target !== 'bulk');
+
+            subContentManual.classList.toggle('hidden', target !== 'manual');
+            subContentBulk.classList.toggle('hidden', target !== 'bulk');
+        }
+
+        adminButton.addEventListener('click', () => {
+            adminModal.classList.remove('hidden');
+            adminModal.classList.add('flex');
+            switchTab('questions'); // Mặc định mở tab Câu hỏi
+            resetForm();
+            resetTopicForm();
+        });
+
+        closeAdminButton.addEventListener('click', () => {
+            adminModal.classList.add('hidden');
+            adminModal.classList.remove('flex');
+        });
+
+        tabQuestions.addEventListener('click', () => switchTab('questions'));
+        tabTopics.addEventListener('click', () => switchTab('topics'));
+        subTabManual.addEventListener('click', () => switchSubTab('manual'));
+        subTabBulk.addEventListener('click', () => switchSubTab('bulk'));
+
+
+        // LOGIC QUẢN LÝ CHỦ ĐỀ (TOPICS) - (ĐÃ SỬA ĐỔI XỬ LÝ LỖI)
+        const topicForm = document.getElementById('topicForm');
+        const topicTableBody = document.getElementById('topicTableBody');
+        const topicFormTitle = document.getElementById('topicFormTitle');
+        const topicDocIdInput = document.getElementById('topicDocId');
+        const topicNameInput = document.getElementById('topicName');
+        const cancelTopicEditButton = document.getElementById('cancelTopicEditButton');
+        const topicCount = document.getElementById('topicCount');
+        const emptyTopicListMessage = document.getElementById('emptyTopicListMessage');
+
+        topicForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const docId = topicDocIdInput.value;
+            const name = topicNameInput.value.trim();
+            const saveButton = document.getElementById('saveTopicButton');
+
+            if (!name) {
+                alert("Tên Chủ đề không được để trống.");
+                return;
+            }
+
+            // Kiểm tra trùng lặp tên Chủ đề
+            const isDuplicate = topicData.some(t => t.name.toLowerCase() === name.toLowerCase() && t.id !== docId);
+            if (isDuplicate) {
+                alert(`Chủ đề "${name}" đã tồn tại. Vui lòng chọn tên khác.`);
+                return;
+            }
+            
+            // Vô hiệu hóa nút và hiển thị trạng thái loading
+            saveButton.disabled = true;
+            saveButton.textContent = docId ? 'Đang cập nhật...' : 'Đang lưu...';
+
+            const newTopic = { name: name };
+            const path = getTopicCollectionPath(userId);
+
+            try {
+                if (docId) {
+                    await updateDoc(doc(db, path, docId), newTopic);
+                    resultMessage.textContent = `Cập nhật Chủ đề "${name}" thành công!`;
+                } else {
+                    await addDoc(collection(db, path), { ...newTopic, timestamp: Date.now() });
+                    resultMessage.textContent = `Thêm Chủ đề mới "${name}" thành công!`;
+                }
+                resetTopicForm();
+            } catch (e) {
+                console.error("Lỗi khi lưu Chủ đề: ", e);
+                // ✨ SỬA ĐỔI QUAN TRỌNG: Hiển thị lỗi chi tiết hơn cho người dùng
+                alert(`LỖI LƯU CHỦ ĐỀ: Việc lưu thất bại. Vui lòng kiểm tra console log để biết chi tiết. 
+                Lỗi: ${e.message}. 
+                (Nếu bạn đang chạy cục bộ, hãy đảm bảo cấu hình Firebase và Security Rules đã được thiết lập chính xác.)`);
+            } finally {
+                // Luôn bật lại nút
+                saveButton.disabled = false;
+                saveButton.textContent = 'Lưu Chủ đề';
+            }
+        });
+
+        window.openTopicEditForm = (docId) => {
+            const topic = topicData.find(t => t.id === docId);
+            if (!topic) return;
+
+            topicFormTitle.textContent = "Chỉnh Sửa Chủ đề";
+            topicDocIdInput.value = docId;
+            topicNameInput.value = topic.name;
+            cancelTopicEditButton.classList.remove('hidden');
+            adminModal.querySelector('.max-w-3xl').scrollTo(0, 0);
+        };
+
+        window.deleteTopic = async (docId, name) => {
+            const questionsInTopic = quizData.filter(q => q.topicId === docId).length;
+            if (questionsInTopic > 0) {
+                alert(`Không thể xóa chủ đề "${name}" vì còn ${questionsInTopic} câu hỏi đang sử dụng. Hãy chuyển hoặc xóa các câu hỏi đó trước.`);
+                return;
+            }
+            if (!window.confirm(`Bạn có chắc chắn muốn xóa Chủ đề: "${name}" không?`)) {
+                return;
+            }
+            try {
+                const path = getTopicCollectionPath(userId);
+                await deleteDoc(doc(db, path, docId));
+                resultMessage.textContent = `Đã xóa thành công Chủ đề: ${name}.`;
+                resetTopicForm();
+            } catch (e) {
+                console.error("Lỗi khi xóa Chủ đề: ", e);
+                alert("Lỗi: Không thể xóa Chủ đề.");
+            }
+        };
+
+        function resetTopicForm() {
+            topicForm.reset();
+            topicDocIdInput.value = '';
+            topicFormTitle.textContent = "Thêm Chủ đề Mới";
+            cancelTopicEditButton.classList.add('hidden');
+        }
+
+        cancelTopicEditButton.addEventListener('click', resetTopicForm);
+
+        function renderTopicList() {
+            topicTableBody.innerHTML = '';
+            topicCount.textContent = topicData.length;
+            if (topicData.length === 0) {
+                emptyTopicListMessage.classList.remove('hidden');
+            } else {
+                emptyTopicListMessage.classList.add('hidden');
+            }
+
+            topicData.forEach((t, index) => {
+                const row = topicTableBody.insertRow();
+                row.className = 'hover:bg-blue-50 transition duration-150';
+                
+                const sttCell = row.insertCell();
+                sttCell.textContent = index + 1;
+                sttCell.className = 'px-3 py-3 whitespace-nowrap text-sm text-gray-900 font-medium';
+
+                const nameCell = row.insertCell();
+                nameCell.textContent = t.name;
+                nameCell.className = 'px-6 py-3 text-sm text-gray-500';
+
+                const count = quizData.filter(q => q.topicId === t.id).length;
+                const countCell = row.insertCell();
+                countCell.textContent = count;
+                countCell.className = 'px-6 py-3 text-sm text-gray-500 text-center';
+
+                const actionsCell = row.insertCell();
+                actionsCell.className = 'px-6 py-3 whitespace-nowrap text-center text-sm font-medium space-x-2';
+                actionsCell.innerHTML = `
+                    <button onclick="openTopicEditForm('${t.id}')" class="text-indigo-600 hover:text-indigo-900 border p-1 rounded-md"> Sửa </button>
+                    <button onclick="deleteTopic('${t.id}', '${t.name.replace(/'/g, "\\'")}')" class="text-red-600 hover:text-red-900 border p-1 rounded-md"> Xóa </button>
+                `;
+            });
+        }
+
+
+        // LOGIC QUẢN LÝ CÂU HỎI (QUESTIONS)
+        const questionForm = document.getElementById('questionForm');
+        const questionTableBody = document.getElementById('questionTableBody');
+        const formTitle = document.getElementById('formTitle');
+        const docIdInput = document.getElementById('docId');
+        const qTextInput = document.getElementById('qText');
+        const topicIdSelect = document.getElementById('topicIdSelect');
+        const questionTypeSelect = document.getElementById('questionTypeSelect');
+        const optionsInputContainer = document.getElementById('optionsInputContainer');
+        const fitbAnswerInputContainer = document.getElementById('fitbAnswerInputContainer');
+        const fitbCorrectTextInput = document.getElementById('fitbCorrectText');
+        const cancelEditButton = document.getElementById('cancelEditButton');
+        const questionCount = document.getElementById('questionCount');
+        const emptyListMessage = document.getElementById('emptyListMessage');
+        // NEW BULK INPUT ELEMENTS
+        const bulkDataInput = document.getElementById('bulkDataInput');
+        const importBulkButton = document.getElementById('importBulkButton');
+        const bulkErrorLog = document.getElementById('bulkErrorLog');
+
+        // Hàm chuyển đổi giữa MC và FITB form
+        questionTypeSelect.addEventListener('change', () => {
+            const type = questionTypeSelect.value;
+            if (type === 'MC') {
+                optionsInputContainer.classList.remove('hidden');
+                fitbAnswerInputContainer.classList.add('hidden');
+                document.getElementById('opt0').required = true;
+                document.querySelector('input[name="correctOption"]').required = true;
+                fitbCorrectTextInput.required = false;
+            } else if (type === 'FITB') {
+                optionsInputContainer.classList.add('hidden');
+                fitbAnswerInputContainer.classList.remove('hidden');
+                document.getElementById('opt0').required = false;
+                document.querySelector('input[name="correctOption"]').required = false;
+                fitbCorrectTextInput.required = true;
+            }
+        });
+
+        // Hàm điền dữ liệu vào form để chỉnh sửa
+        window.openEditForm = (docId) => {
+            switchSubTab('manual'); // Chuyển về tab Thêm thủ công
+            const question = quizData.find(q => q.id === docId);
+            if (!question) return;
+
+            formTitle.textContent = "Chỉnh Sửa Câu Hỏi";
+            docIdInput.value = docId;
+            qTextInput.value = question.text;
+            questionTypeSelect.value = question.type || 'MC';
+            questionTypeSelect.dispatchEvent(new Event('change'));
+
+            if (question.type === 'MC') {
+                question.options.forEach((option, index) => {
+                    document.getElementById(`opt${index}`).value = option;
+                });
+                const correctRadio = document.querySelector(`input[name="correctOption"][value="${question.correctIndex}"]`);
+                if(correctRadio) correctRadio.checked = true;
+                fitbCorrectTextInput.value = '';
+            } else if (question.type === 'FITB') {
+                fitbCorrectTextInput.value = question.correctAnswerText || '';
+            }
+            document.getElementById('topicIdSelect').value = question.topicId || '';
+            cancelEditButton.classList.remove('hidden');
+            adminModal.querySelector('.max-w-3xl').scrollTo(0, 0);
+            switchTab('questions');
+        };
+
+        // Hàm xóa câu hỏi
+        window.deleteQuestion = async (docId, qText) => {
+            if (!window.confirm(`Bạn có chắc chắn muốn xóa câu hỏi: "${qText.substring(0, 50)}..." không?`)) {
+                return;
+            }
+            try {
+                const path = getQuestionCollectionPath(userId);
+                await deleteDoc(doc(db, path, docId));
+                resultMessage.textContent = `Đã xóa thành công câu hỏi.`;
+                resetForm();
+            } catch (e) {
+                console.error("Lỗi khi xóa câu hỏi: ", e);
+                alert("Lỗi: Không thể xóa câu hỏi.");
+            }
+        };
+
+        // Hàm reset form
+        function resetForm() {
+            questionForm.reset();
+            docIdInput.value = '';
+            formTitle.textContent = "Thêm Câu Hỏi Mới";
+            cancelEditButton.classList.add('hidden');
+            questionTypeSelect.value = 'MC'; // Quay lại mặc định
+            questionTypeSelect.dispatchEvent(new Event('change'));
+        }
+
+        cancelEditButton.addEventListener('click', resetForm);
+
+        // Xử lý gửi form (Thêm mới hoặc Cập nhật)
+        questionForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const docId = docIdInput.value;
+            const text = qTextInput.value.trim();
+            const topicId = topicIdSelect.value;
+            const type = questionTypeSelect.value;
+            
+            let newQuestion = { text: text, topicId: topicId, type: type };
+
+            if (type === 'MC') {
+                const options = [
+                    document.getElementById('opt0').value.trim(),
+                    document.getElementById('opt1').value.trim(),
+                    document.getElementById('opt2').value.trim(),
+                    document.getElementById('opt3').value.trim()
+                ];
+                const correctOptionElement = document.querySelector('input[name="correctOption"]:checked');
+
+                if (!correctOptionElement || options.some(opt => !opt)) {
+                    alert("Vui lòng điền đầy đủ 4 lựa chọn và chọn đáp án đúng cho câu trắc nghiệm.");
+                    return;
+                }
+                newQuestion.options = options;
+                newQuestion.correctIndex = parseInt(correctOptionElement.value);
+            } else if (type === 'FITB') {
+                const correctText = fitbCorrectTextInput.value.trim();
+                if (!correctText) {
+                    alert("Vui lòng điền đáp án chính xác cho câu điền vào chỗ trống.");
+                    return;
+                }
+                newQuestion.correctAnswerText = correctText;
+            }
+
+            const path = getQuestionCollectionPath(userId);
+            const saveButton = document.getElementById('saveQuestionButton');
+            saveButton.disabled = true;
+            saveButton.textContent = 'Đang lưu...';
+
+            try {
+                if (docId) {
+                    await updateDoc(doc(db, path, docId), newQuestion);
+                    resultMessage.textContent = "Cập nhật câu hỏi thành công!";
+                } else {
+                    await addDoc(collection(db, path), { ...newQuestion, timestamp: Date.now() });
+                    resultMessage.textContent = "Thêm câu hỏi mới thành công!";
+                }
+                resetForm();
+            } catch (e) {
+                console.error("Lỗi khi lưu câu hỏi: ", e);
+                alert(`LỖI LƯU CÂU HỎI: Việc lưu thất bại. Lỗi: ${e.message}`);
+            } finally {
+                saveButton.disabled = false;
+                saveButton.textContent = 'Lưu Câu Hỏi';
+            }
+        });
+
+        // Hàm điền dữ liệu vào dropdown Chủ đề
+        function renderQuestionFormDropdown() {
+            topicIdSelect.innerHTML = '<option value="" disabled selected>-- Chọn Chủ đề --</option>';
+            if (topicData.length === 0) {
+                topicIdSelect.innerHTML = '<option value="" disabled selected>-- Chưa có Chủ đề. Thêm trong tab Quản lý Chủ đề --</option>';
+                topicIdSelect.disabled = true;
+            } else {
+                topicIdSelect.disabled = false;
+                topicData.forEach(topic => {
+                    const option = document.createElement('option');
+                    option.value = topic.id;
+                    option.textContent = topic.name;
+                    topicIdSelect.appendChild(option);
+                });
+            }
+        }
+
+        // Hàm hiển thị danh sách câu hỏi trong Admin Panel
+        function renderAdminList() {
+            questionTableBody.innerHTML = '';
+            questionCount.textContent = quizData.length;
+            if (quizData.length === 0) {
+                emptyListMessage.classList.remove('hidden');
+            } else {
+                emptyListMessage.classList.add('hidden');
+                quizData.forEach((q, index) => {
+                    const row = questionTableBody.insertRow();
+                    row.className = 'hover:bg-blue-50 transition duration-150';
+
+                    const sttCell = row.insertCell();
+                    sttCell.textContent = index + 1;
+                    sttCell.className = 'px-3 py-3 whitespace-nowrap text-sm text-gray-900 font-medium';
+
+                    const topic = topicData.find(t => t.id === q.topicId);
+                    const topicCell = row.insertCell();
+                    topicCell.textContent = topic ? topic.name : 'Chưa phân loại';
+                    topicCell.className = 'px-6 py-3 text-sm text-gray-600 font-medium';
+
+                    const typeCell = row.insertCell();
+                    typeCell.textContent = q.type === 'FITB' ? 'Điền trống' : 'Trắc nghiệm';
+                    typeCell.className = 'px-6 py-3 text-sm font-semibold text-purple-600';
+
+                    const qTextCell = row.insertCell();
+                    qTextCell.textContent = q.text.substring(0, 70) + (q.text.length > 70 ? '...' : '');
+                    qTextCell.className = 'px-6 py-3 text-sm text-gray-500';
+
+                    const correctCell = row.insertCell();
+                    correctCell.textContent = getCorrectAnswer(q);
+                    correctCell.className = 'px-6 py-3 whitespace-nowrap text-sm font-semibold text-green-600';
+
+                    const actionsCell = row.insertCell();
+                    actionsCell.className = 'px-6 py-3 whitespace-nowrap text-center text-sm font-medium space-x-2';
+                    actionsCell.innerHTML = `
+                        <button onclick="openEditForm('${q.id}')" class="text-indigo-600 hover:text-indigo-900 border p-1 rounded-md"> Sửa </button>
+                        <button onclick="deleteQuestion('${q.id}', \`${q.text.replace(/'/g, "\\'")}\`)" class="text-red-600 hover:text-red-900 border p-1 rounded-md"> Xóa </button>
+                    `;
+                });
+            }
+        }
+
+        // --- LOGIC NHẬP HÀNG LOẠT MỚI ---
+        importBulkButton.addEventListener('click', importBulkData);
+
+        async function importBulkData() {
+            const jsonString = bulkDataInput.value.trim();
+            bulkErrorLog.classList.add('hidden');
+            bulkErrorLog.textContent = '';
+
+            if (!jsonString) {
+                bulkErrorLog.textContent = "Vui lòng dán dữ liệu JSON vào ô nhập.";
+                bulkErrorLog.classList.remove('hidden');
+                return;
+            }
+
+            let questions;
+            try {
+                questions = JSON.parse(jsonString);
+                if (!Array.isArray(questions)) throw new Error("Dữ liệu phải là một mảng JSON.");
+            } catch (e) {
+                bulkErrorLog.textContent = `Lỗi định dạng JSON: ${e.message}`;
+                bulkErrorLog.classList.remove('hidden');
+                return;
+            }
+
+            const topicMap = new Map(topicData.map(t => [t.name.toLowerCase(), t.id]));
+            const validQuestions = [];
+            const errors = [];
+
+            questions.forEach((q, index) => {
+                const qNum = index + 1;
+                let isValid = true;
+                
+                // 1. Kiểm tra cấu trúc cơ bản
+                if (!q.topicName || !q.type || !q.text) {
+                    errors.push(`Câu #${qNum}: Thiếu trường 'topicName', 'type' hoặc 'text'.`);
+                    isValid = false;
+                }
+
+                // 2. Kiểm tra Chủ đề tồn tại
+                const topicId = topicMap.get(q.topicName?.toLowerCase());
+                if (!topicId) {
+                    errors.push(`Câu #${qNum}: Chủ đề '${q.topicName}' không tồn tại. Vui lòng tạo Chủ đề này trước.`);
+                    isValid = false;
+                }
+
+                // 3. Kiểm tra loại câu hỏi (MC / FITB)
+                if (isValid) {
+                    if (q.type === 'MC') {
+                        if (!Array.isArray(q.options) || q.options.length !== 4 || typeof q.correctIndex !== 'number' || q.correctIndex < 0 || q.correctIndex > 3) {
+                            errors.push(`Câu #${qNum} (MC): Phải có 4 'options' và 'correctIndex' phải là số từ 0 đến 3.`);
+                            isValid = false;
+                        }
+                    } else if (q.type === 'FITB') {
+                        if (!q.correctAnswerText) {
+                            errors.push(`Câu #${qNum} (FITB): Thiếu trường 'correctAnswerText'.`);
+                            isValid = false;
+                        }
+                    } else {
+                        errors.push(`Câu #${qNum}: Loại câu hỏi '${q.type}' không hợp lệ. Chỉ chấp nhận 'MC' hoặc 'FITB'.`);
+                        isValid = false;
+                    }
+                }
+
+                if (isValid) {
+                    // Tạo đối tượng câu hỏi hợp lệ để lưu vào Firestore
+                    const newQuestion = {
+                        topicId: topicId,
+                        type: q.type,
+                        text: q.text.trim(),
+                        timestamp: Date.now() + index, // Đảm bảo timestamp duy nhất
+                    };
+
+                    if (q.type === 'MC') {
+                        newQuestion.options = q.options.map(opt => opt.trim());
+                        newQuestion.correctIndex = q.correctIndex;
+                    } else if (q.type === 'FITB') {
+                        newQuestion.correctAnswerText = q.correctAnswerText.trim();
+                    }
+                    validQuestions.push(newQuestion);
+                }
+            });
+
+            if (errors.length > 0) {
+                bulkErrorLog.textContent = `Tìm thấy ${errors.length} lỗi:\n- ${errors.join('\n- ')}`;
+                bulkErrorLog.classList.remove('hidden');
+                return;
+            }
+
+            if (validQuestions.length === 0) {
+                bulkErrorLog.textContent = "Không có câu hỏi hợp lệ nào được tìm thấy để nhập.";
+                bulkErrorLog.classList.remove('hidden');
+                return;
+            }
+
+            // Tiến hành nhập vào Firestore (Batch write là tốt nhất, nhưng dùng vòng lặp đơn giản)
+            const questionPath = getQuestionCollectionPath(userId);
+            let successCount = 0;
+
+            importBulkButton.disabled = true;
+            importBulkButton.textContent = 'Đang nhập...';
+
+            try {
+                for (const q of validQuestions) {
+                    await addDoc(collection(db, questionPath), q);
+                    successCount++;
+                }
+                resultMessage.textContent = `Nhập thành công ${successCount} câu hỏi mới!`;
+                bulkDataInput.value = ''; // Xóa input sau khi thành công
+                switchSubTab('manual'); // Quay lại tab xem danh sách
+                bulkErrorLog.classList.add('hidden');
+            } catch (e) {
+                console.error("Lỗi khi nhập hàng loạt: ", e);
+                bulkErrorLog.textContent = `Lỗi trong quá trình lưu ${successCount} câu hỏi đầu tiên. Vui lòng kiểm tra kết nối/quyền truy cập. Lỗi: ${e.message}`;
+                bulkErrorLog.classList.remove('hidden');
+            } finally {
+                importBulkButton.disabled = false;
+                importBulkButton.textContent = 'Xác Nhận & Nhập Câu Hỏi Hàng Loạt';
+            }
+        }
+
+
+        // --- 6. LOGIC VÒNG QUAY VÀ QUIZ ---
+        const canvas = document.getElementById('luckyWheel');
+        const ctx = canvas.getContext('2d');
+        const spinButton = document.getElementById('spinButton');
+        const resultMessage = document.getElementById('resultMessage');
+        const quizModal = document.getElementById('quizModal');
+        const quizTitle = document.getElementById('quizTitle');
+        const questionTextElement = document.getElementById('questionText');
+        const mcOptionsContainer = document.getElementById('mcOptionsContainer');
+        const fitbContainer = document.getElementById('fitbContainer');
+        const fitbAnswerInput = document.getElementById('fitbAnswerInput');
+        const fitbSubmitButton = document.getElementById('fitbSubmitButton');
+        const feedbackBox = document.getElementById('feedbackBox');
+        const nextButton = document.getElementById('nextButton');
+        const loadingMessage = document.getElementById('loadingMessage');
+
+        spinButton.disabled = true;
+
+        const size = Math.min(window.innerWidth * 0.9, 400);
+        canvas.width = size;
+        canvas.height = size;
+        const centerX = size / 2;
+        const centerY = size / 2;
+        const radius = size / 2;
+
+        let angle = 0;
+        let isSpinning = false;
+        let spinTime = 0;
+        let spinTimeTotal = 0;
+        let totalSpinAngle = 0;
+        let currentSpinAngle = 0;
+        let activeQuestion = null;
+
+
+        function drawWheel() {
+            const topicsWithQuestions = topicData.filter(t => quizData.some(q => q.topicId === t.id));
+            const numSegments = topicsWithQuestions.length;
+
+            if (numSegments === 0) {
+                ctx.clearRect(0, 0, size, size);
+                return;
+            }
+
+            const arc = (Math.PI * 2) / numSegments;
+            const segments = topicsWithQuestions.map((data, index) => ({
+                label: data.name,
+                color: ['#FFD700', '#FF6347', '#3CB371', '#4682B4', '#9370DB', '#FFA07A', '#00CED1', '#FF69B4', '#ADFF2F', '#F4A460'][index % 10],
+                topicId: data.id
+            }));
+
+            ctx.clearRect(0, 0, size, size);
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(angle);
+
+            for (let i = 0; i < numSegments; i++) {
+                const startAngle = i * arc;
+                const endAngle = startAngle + arc;
+
+                // 1. Vẽ cung tròn (Segment)
+                ctx.beginPath();
+                ctx.arc(0, 0, radius, startAngle, endAngle);
+                ctx.lineTo(0, 0);
+                ctx.closePath();
+                ctx.fillStyle = segments[i].color;
+                ctx.fill();
+
+                // 2. Vẽ đường viền
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // 3. Vẽ chữ (Label)
+                ctx.save();
+                ctx.fillStyle = '#1f2937';
+                ctx.font = 'bold 16px Inter';
+                const textAngle = startAngle + arc / 2;
+                ctx.rotate(textAngle);
+                ctx.textAlign = 'right';
+                const label = segments[i].label.length > 20 ? segments[i].label.substring(0, 17) + '...' : segments[i].label;
+                ctx.fillText(label, radius * 0.7, 5);
+                ctx.restore();
+            }
+            ctx.restore();
+        }
+
+        function spin() {
+            spinTime += 30;
+            if (spinTime >= spinTimeTotal) {
+                stopSpin();
+                return;
+            }
+            const spinAngle = angleEasing(spinTime, 0, totalSpinAngle, spinTimeTotal);
+            angle += spinAngle - currentSpinAngle;
+            currentSpinAngle = spinAngle;
+            drawWheel();
+            requestAnimationFrame(spin);
+        }
+
+        function angleEasing(t, b, c, d) {
+            // Hàm easing (giảm tốc độ dần)
+            t /= d;
+            return c * t * t * t * t * t + b;
+        }
+
+        function stopSpin() {
+            isSpinning = false;
+            spinButton.disabled = false;
+            resultMessage.textContent = "Vòng quay đã dừng!";
+            playStopSound(); // Phát âm thanh dừng
+
+            const topicsWithQuestions = topicData.filter(t => quizData.some(q => q.topicId === t.id));
+            const numSegments = topicsWithQuestions.length;
+            if (numSegments === 0) return;
+
+            const arc = (Math.PI * 2) / numSegments;
+
+            // Tính toán góc dừng
+            const normalisedAngle = (angle % (Math.PI * 2) + Math.PI * 2) % (Math.PI * 2);
+            // Chuẩn hóa góc để 0 độ ở vị trí kim chỉ (phía trên)
+            const correctedAngle = (Math.PI * 2) - ((normalisedAngle + Math.PI / 2) % (Math.PI * 2)); 
+            
+            const degrees = correctedAngle * (180 / Math.PI);
+            const segmentDegrees = 360 / numSegments;
+            const segmentIndex = Math.floor(degrees / segmentDegrees);
+
+            const selectedTopic = topicsWithQuestions[segmentIndex];
+
+            // 1. Tìm tất cả câu hỏi cho Chủ đề này
+            const relevantQuestions = quizData.filter(q => q.topicId === selectedTopic.id);
+
+            // 2. Chọn ngẫu nhiên một câu hỏi
+            const randomIndex = Math.floor(Math.random() * relevantQuestions.length);
+            activeQuestion = relevantQuestions[randomIndex]; // Lưu câu hỏi đang hoạt động
+
+            // 3. Hiển thị Quiz Modal
+            showQuiz(activeQuestion, selectedTopic);
+        }
+
+        function startSpin() {
+            if (isSpinning || spinButton.disabled) {
+                return;
+            }
+            isSpinning = true;
+            spinButton.disabled = true;
+            resultMessage.textContent = "Đang quay...";
+            playSpinSound(); // Phát âm thanh quay
+
+            spinTime = 0;
+            spinTimeTotal = Math.random() * 3000 + 4000;
+
+            const topicsWithQuestions = topicData.filter(t => quizData.some(q => q.topicId === t.id));
+            const numSegments = topicsWithQuestions.length;
+            const arc = (Math.PI * 2) / numSegments;
+
+            // Chọn ngẫu nhiên segment mục tiêu
+            const targetSegmentIndex = Math.floor(Math.random() * numSegments);
+
+            const targetSegmentStartAngle = targetSegmentIndex * arc;
+            const targetSegmentMidAngle = targetSegmentStartAngle + arc / 2;
+            
+            // Góc cần quay thêm để đưa tâm segment mục tiêu về vị trí kim chỉ
+            const angleToTarget = (Math.PI * 2) - (targetSegmentMidAngle + Math.PI / 2); 
+            
+            // Tổng góc quay (10 vòng + góc chính xác)
+            totalSpinAngle = (10 * Math.PI * 2) + angleToTarget; 
+            currentSpinAngle = 0;
+            
+            spin();
+        }
+
+        // Hàm chuẩn hóa chuỗi (loại bỏ dấu, viết thường) cho FITB
+        function normalizeString(str) {
+            if (!str) return "";
+            // Loại bỏ dấu tiếng Việt và chuyển thành chữ thường, loại bỏ khoảng trắng dư thừa
+            return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim().replace(/\s+/g, ' ');
+        }
+
+        function showQuiz(question, topic) {
+            quizTitle.textContent = `Chủ đề: ${topic.name} (${question.type === 'FITB' ? 'Điền trống' : 'Trắc nghiệm'})`;
+            questionTextElement.textContent = question.text;
+            feedbackBox.classList.add('hidden');
+            nextButton.classList.add('hidden');
+
+            if (question.type === 'MC') {
+                mcOptionsContainer.classList.remove('hidden');
+                fitbContainer.classList.add('hidden');
+                mcOptionsContainer.innerHTML = '';
+                question.options.forEach((option, index) => {
+                    const button = document.createElement('button');
+                    button.textContent = option;
+                    button.className = 'w-full text-left p-3 rounded-lg border-2 border-blue-300 bg-blue-100 text-gray-800 font-medium hover:bg-blue-200 transition duration-150 ease-in-out option-button';
+                    button.dataset.index = index;
+                    button.onclick = (e) => checkMcAnswer(e.target, question.correctIndex, getCorrectAnswer(question));
+                    mcOptionsContainer.appendChild(button);
+                });
+            } else if (question.type === 'FITB') {
+                fitbContainer.classList.remove('hidden');
+                mcOptionsContainer.classList.add('hidden');
+                fitbAnswerInput.value = '';
+                fitbAnswerInput.disabled = false;
+                fitbSubmitButton.disabled = false;
+            }
+            quizModal.classList.remove('hidden');
+            quizModal.classList.add('flex');
+        }
+
+        // Kiểm tra đáp án Trắc nghiệm
+        function checkMcAnswer(selectedButton, correctIndex, correctText) {
+            const allButtons = mcOptionsContainer.querySelectorAll('.option-button');
+            allButtons.forEach(btn => btn.disabled = true);
+
+            const selectedIndex = parseInt(selectedButton.dataset.index);
+            let isCorrect = false;
+
+            // Đánh dấu đáp án đúng/sai
+            allButtons.forEach(btn => {
+                 const index = parseInt(btn.dataset.index);
+                 if (index === correctIndex) {
+                    btn.classList.remove('bg-blue-100');
+                    btn.classList.add('bg-green-300', 'border-green-500'); // Màu xanh cho đáp án đúng
+                 }
+            });
+
+            if (selectedIndex === correctIndex) {
+                selectedButton.className = selectedButton.className.replace('bg-green-300', 'bg-green-500 text-white');
+                feedbackBox.textContent = `Chính xác! Đáp án là: ${correctText}`;
+                feedbackBox.className = 'mt-4 p-3 rounded-lg font-semibold bg-green-100 text-green-700';
+                isCorrect = true;
+                playCorrectSound();
+                updateScore(10);
+            } else {
+                selectedButton.classList.remove('bg-blue-100');
+                selectedButton.classList.add('bg-red-500', 'text-white', 'border-red-500');
+                feedbackBox.textContent = `Sai rồi. Đáp án đúng là: ${correctText}`;
+                feedbackBox.className = 'mt-4 p-3 rounded-lg font-semibold bg-red-100 text-red-700';
+                playIncorrectSound();
+            }
+            
+            feedbackBox.classList.remove('hidden');
+            nextButton.classList.remove('hidden');
+        }
+
+        // Kiểm tra đáp án Điền vào chỗ trống
+        function checkFitbAnswer() {
+            if (!activeQuestion || activeQuestion.type !== 'FITB') return;
+
+            fitbAnswerInput.disabled = true;
+            fitbSubmitButton.disabled = true;
+            
+            const userAnswer = fitbAnswerInput.value;
+            const correctText = activeQuestion.correctAnswerText;
+            
+            const normalizedUser = normalizeString(userAnswer);
+            const normalizedCorrect = normalizeString(correctText);
+
+            let isCorrect = false;
+
+            if (normalizedUser === normalizedCorrect && normalizedUser !== '') {
+                feedbackBox.textContent = `Chính xác! Đáp án là: ${correctText}`;
+                feedbackBox.className = 'mt-4 p-3 rounded-lg font-semibold bg-green-100 text-green-700';
+                isCorrect = true;
+                playCorrectSound();
+                updateScore(10);
+            } else {
+                feedbackBox.textContent = `Sai rồi. Đáp án đúng là: ${correctText}. Bạn đã nhập: "${userAnswer}"`;
+                feedbackBox.className = 'mt-4 p-3 rounded-lg font-semibold bg-red-100 text-red-700';
+                playIncorrectSound();
+            }
+
+            feedbackBox.classList.remove('hidden');
+            nextButton.classList.remove('hidden');
+        }
+
+        // --- 7. KHỞI TẠO VÀ EVENTS ---
+        window.onload = () => {
+            loadingMessage.classList.remove('hidden');
+            initializeFirebase();
+            drawWheel();
+        };
+
+        spinButton.addEventListener('click', startSpin);
+        fitbSubmitButton.addEventListener('click', checkFitbAnswer);
+
+        nextButton.addEventListener('click', () => {
+            quizModal.classList.add('hidden');
+            quizModal.classList.remove('flex');
+            activeQuestion = null;
+            checkSpinEligibility();
+        });
+
+        questionTypeSelect.dispatchEvent(new Event('change'));
+    </script>
+</body>
+</html>
