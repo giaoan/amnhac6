@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vòng Quay May Mắn Âm Nhạc 6</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap" rel="stylesheet">
+    <style>
+        /* Tùy chỉnh CSS cho giao diện game */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f3e8; 
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        /* Bố cục chính: Đặt vòng quay và BXH cạnh nhau */
+        .main-layout {
+            display: flex;
+            gap: 40px; 
+            align-items: flex-start;
+            max-width: 1000px; 
+            width: 95%;
+            margin-top: 20px;
+        }
+
+        .wheel-area {
+            flex-shrink: 0; 
+        }
+
+        .wheel-container {
+            width: 550px; /* Kích thước mới cho vòng quay */
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background-color: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1), 0 5px 10px rgba(0, 0, 0, 0.05);
+            padding: 20px;
+            text-align: center;
+            position: relative;
+        }
+
+        #gameCanvas {
+            display: block;
+            width: 550px; /* Kích thước mới */
+            height: 550px; /* Kích thước mới */
+            border-radius: 50%;
+            margin: 20px auto;
+            border: 10px solid #ffcc00; 
+            box-shadow: 0 0 20px rgba(255, 204, 0, 0.5);
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Kim chỉ (pointer) */
+        .pointer {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            /* Điều chỉnh translateY để kim chỉ đúng vị trí trên đỉnh vòng quay 550px */
+            transform: translate(-50%, -100%) translateY(-275px) rotate(90deg); 
+            z-index: 20;
+            width: 0;
+            height: 0;
+            border-left: 15px solid transparent;
+            border-right: 15px solid transparent;
+            border-top: 30px solid #e74c3c; 
+            filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.5));
+        }
+
+        .spin-button {
+            padding: 10px 30px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #ffffff;
+            background: linear-gradient(145deg, #f39c12, #e67e22);
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px #d35400;
+            margin-top: 10px;
+        }
+
+        .spin-button:hover:not(:disabled) {
+            background: linear-gradient(145deg, #e67e22, #f39c12);
+            transform: translateY(-2px);
+            box-shadow: 0 6px #d35400;
+        }
+
+        .spin-button:active:not(:disabled) {
+            transform: translateY(2px);
+            box-shadow: 0 2px #d35400;
+        }
+        
+        .spin-button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            box-shadow: 0 4px #bdc3c7;
+        }
+
+        .result-box {
+            min-height: 80px;
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #ecf0f1;
+            border-radius: 10px;
+            width: 100%;
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .result-content {
+            font-size: 1.5rem;
+            font-weight: 800;
+            margin-top: 5px;
+        }
+
+        /* Styling cho Leaderboard - Đặt chiều rộng cố định nhỏ hơn */
+        .leaderboard-area {
+            width: 350px; /* Chiều rộng cố định */
+            flex-shrink: 0; 
+            background-color: #ffffff;
+            border-radius: 20px;
+            box-shadow: 0 15px 30px rgba(0, 0, 0, 0.1), 0 5px 10px rgba(0, 0, 0, 0.05);
+            padding: 20px;
+        }
+
+        .leaderboard-table th {
+            background-color: #34495e;
+            color: white;
+            padding: 12px 0;
+            text-align: center;
+        }
+
+        .leaderboard-table tr.active-turn {
+            background-color: #fff9e6; /* Hàng đang quay */
+            box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+            animation: pulse-active 1.5s infinite;
+        }
+        
+        @keyframes pulse-active {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
+
+        /* Modal CSS */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background: #ffffff;
+            border-radius: 15px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+            animation: fadeIn 0.3s;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .option-button {
+            padding: 12px;
+            margin: 8px 0;
+            width: 100%;
+            border-radius: 8px;
+            background-color: #ecf0f1;
+            transition: background-color 0.2s, transform 0.1s;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .option-button:hover {
+            background-color: #bdc3c7;
+            transform: translateY(-1px);
+        }
+
+        /* Điều chỉnh cho màn hình nhỏ */
+        @media (max-width: 960px) {
+            .main-layout {
+                flex-direction: column; 
+                align-items: center;
+                gap: 20px;
+            }
+            .wheel-container {
+                width: 100%; 
+                max-width: 550px; /* Giữ max width cho mobile */
+            }
+            #gameCanvas {
+                width: 100%;
+                height: auto;
+                aspect-ratio: 1 / 1; 
+            }
+            .pointer {
+                display: none; 
+            }
+            .leaderboard-area {
+                width: 100%; /* Trở lại 100% trên mobile */
+                max-width: 550px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- MODAL LỰA CHỌN SAO HI VỌNG -->
+    <div id="wildChoiceModal" class="modal">
+        <div class="modal-content">
+            <h3 class="text-3xl font-extrabold text-red-600 mb-4 text-center">NGÔI SAO HI VỌNG!</h3>
+            <p class="text-xl text-gray-700 mb-6 text-center">Đội **<span id="wildTeamName" class="text-purple-700 font-extrabold"></span>** hãy chọn Quyền năng:</p>
+
+            <!-- Option 1: Chiến lược -->
+            <button onclick="handleWILDChoice(1)" class="option-button bg-blue-600 text-white hover:bg-blue-700 transition-colors">
+                1. CHIẾN LƯỢC: Chọn Chủ đề yêu thích (Vận dụng 80 Điểm).
+            </button>
+            <p class="text-sm text-gray-500 mb-4 ml-4 italic">
+                (Tối ưu hóa khả năng trả lời đúng câu hỏi **Vận dụng** theo Chủ đề mạnh nhất của đội)
+            </p>
+
+            <!-- Option 2: Cơ hội/Đặt Cược -->
+            <button onclick="handleWILDChoice(2)" class="option-button bg-yellow-600 text-white hover:bg-yellow-700 transition-colors">
+                2. CƠ HỘI (ĐẶT CƯỢC): Cướp 10 Điểm từ Đội cao điểm nhất!
+            </button>
+            <p class="text-sm text-gray-500 mb-4 ml-4 italic">
+                (Đúng: +80 Điểm + Thưởng 10 Điểm + **Cướp 10 Điểm**. Sai: **Bị trừ 10 Điểm**.)
+            </p>
+        </div>
+    </div>
+
+    <!-- MODAL CHỌN CHỦ ĐỀ (Dùng cho Option 1) -->
+    <div id="subjectSelectModal" class="modal">
+        <div class="modal-content">
+            <h3 class="text-3xl font-extrabold text-blue-600 mb-4 text-center">CHỌN CHỦ ĐỀ CHIẾN LƯỢC</h3>
+            <p class="text-xl text-gray-700 mb-6 text-center">Đội **<span id="subjectSelectTeamName" class="text-purple-700 font-extrabold"></span>** muốn trả lời câu hỏi Vận dụng (80 Điểm) thuộc chủ đề nào?</p>
+            <div id="subjectOptionsContainer" class="grid grid-cols-2 gap-3">
+                <!-- Subject buttons will be injected here -->
+            </div>
+        </div>
+    </div>
+
+
+    <!-- MODAL HIỂN THỊ CÂU HỎI -->
+    <div id="questionModal" class="modal">
+        <div class="modal-content">
+            <h3 class="text-xl font-bold text-gray-700 mb-2" id="modalSubject">Chủ đề:</h3>
+            <p class="text-2xl font-extrabold text-blue-800 mb-4" id="modalQuestion">Nội dung câu hỏi...</p>
+            
+            <div id="optionsContainer">
+                <!-- Các nút tùy chọn A, B, C, D sẽ được thêm vào đây -->
+            </div>
+            
+            <div id="feedbackMessage" class="mt-4 text-center text-lg font-bold"></div>
+
+            <button id="nextTurnButton" class="spin-button mt-4 hidden w-full" onclick="moveToNextTurn()">LƯỢT TIẾP THEO</button>
+        </div>
+    </div>
+    
+    <!-- KHU VỰC CHÍNH -->
+    <div class="main-layout">
+        
+        <!-- KHU VỰC VÒNG QUAY (550px) -->
+        <div class="wheel-area">
+            <div class="wheel-container">
+                <h1 class="text-3xl font-bold text-gray-800 mb-4">Vòng Quay May Mắn Âm Nhạc 6</h1>
+                
+                <!-- Kim chỉ -->
+                <div class="pointer"></div>
+
+                <!-- Canvas chứa vòng quay -->
+                <canvas id="gameCanvas" width="550" height="550"></canvas>
+
+                <!-- Nút quay -->
+                <button id="spinButton" class="spin-button">QUAY NGAY</button>
+
+                <!-- Hộp hiển thị kết quả -->
+                <div class="result-box">
+                    <div class="result-title">Kết quả: <span id="currentTeamName" class="text-indigo-600 font-extrabold">Đội Vàng</span> quay trúng:</div>
+                    <div id="resultText" class="result-content text-red-500">Chưa quay</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- KHU VỰC BẢNG XẾP HẠNG (350px) -->
+        <div class="leaderboard-area">
+            <h2 class="text-2xl font-extrabold text-gray-800 mb-4 border-b-2 pb-2 border-yellow-500">Bảng Xếp Hạng</h2>
+            
+            <table class="w-full leaderboard-table rounded-xl overflow-hidden">
+                <thead>
+                    <tr>
+                        <th class="w-1/6">HẠNG</th>
+                        <th class="w-3/6 text-left pl-4">ĐỘI</th>
+                        <th class="w-2/6">ĐIỂM</th>
+                    </tr>
+                </thead>
+                <tbody id="leaderboardBody">
+                    <!-- Dữ liệu đội sẽ được thêm vào đây bằng JavaScript -->
+                </tbody>
+            </table>
+            <p class="mt-4 text-sm text-gray-500 italic">Lượt chơi thuộc về đội được tô vàng.</p>
+        </div>
+
+    </div>
+
+    <script>
+        // Lấy các phần tử HTML
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const spinButton = document.getElementById('spinButton');
+        const resultText = document.getElementById('resultText');
+        const leaderboardBody = document.getElementById('leaderboardBody');
+        const currentTeamNameSpan = document.getElementById('currentTeamName');
+        
+        // Modal elements
+        const questionModal = document.getElementById('questionModal');
+        const modalSubject = document.getElementById('modalSubject');
+        const modalQuestion = document.getElementById('modalQuestion');
+        const optionsContainer = document.getElementById('optionsContainer');
+        const feedbackMessage = document.getElementById('feedbackMessage');
+        const nextTurnButton = document.getElementById('nextTurnButton');
+
+        // WILD Modal Elements
+        const wildChoiceModal = document.getElementById('wildChoiceModal');
+        const wildTeamNameSpan = document.getElementById('wildTeamName');
+        const subjectSelectModal = document.getElementById('subjectSelectModal');
+        const subjectSelectTeamNameSpan = document.getElementById('subjectSelectTeamName');
+        const subjectOptionsContainer = document.getElementById('subjectOptionsContainer');
+
+
+        // Khai báo kích thước vòng quay và hằng số
+        const centerX = canvas.width / 2; // 275
+        const centerY = canvas.height / 2; // 275
+        const radius = centerX - 15; // 260 
+
+        // Dữ liệu các phần thưởng
+        const segments = [
+            { text: "20 ĐIỂM", value: 20, color: "#f1c40f" },
+            { text: "MẤT LƯỢT", value: 0, color: "#e74c3c" },
+            { text: "30 ĐIỂM", value: 30, color: "#3498db" },
+            { text: "X2 ĐIỂM", value: 'X2', color: "#2ecc71" }, // Mức Hiểu - 50 Điểm
+            { text: "10 ĐIỂM", value: 10, color: "#9b59b6" },
+            { text: "20 ĐIỂM", value: 20, color: "#e67e22" },
+            { text: "NGÔI SAO HI VỌNG", value: 'WILD', color: "#ff5722" }, // Mức Vận Dụng - 80 Điểm
+            { text: "10 ĐIỂM", value: 10, color: "#1abc9c" }
+        ];
+
+        const numSegments = segments.length;
+        const segmentAngle = 2 * Math.PI / numSegments;
+        
+        let rotation = 0;
+        let spinning = false;
+        let targetSegment = -1;
+        let currentPoints = 0; // Điểm sẽ được cộng nếu trả lời đúng
+
+        // Dữ liệu Đội
+        let teams = [
+            { name: "Đội Vàng", score: 0, color: "#f39c12", id: 0 },
+            { name: "Đội Xanh", score: 0, color: "#3498db", id: 1 },
+            { name: "Đội Đỏ", score: 0, color: "#e74c3c", id: 2 },
+            { name: "Đội Lục", score: 0, color: "#2ecc71", id: 3 }
+        ];
+
+        let activeTeamIndex = 0;
+        let questionsUsed = new Set(); // Theo dõi câu hỏi đã dùng
+
+        // --- KHO DỮ LIỆU 120 CÂU HỎI ÂM NHẠC LỚP 6 CÁNH DIỀU ---
+        const SUBJECTS = ["Nhạc lí", "Tập đọc nhạc", "Âm nhạc thường thức", "Nghe và Đoán", "Nghệ sĩ", "Học hát"];
+        const DIFFICULTIES = ["Biết", "Hiểu", "Vận dụng"];
+        
+        const QUESTIONS = {
+            "Nhạc lí": {
+                "Biết": [
+                    { q: "Trong hệ thống ký hiệu âm nhạc, nốt nhạc có giá trị trường độ bằng 1/4 nốt tròn được gọi là nốt gì?", a: "Nốt đen", b: "Nốt trắng", c: "Nốt móc đơn", d: "Nốt tròn", correct: 'A', id: "NL-B1" },
+                    { q: "Ký hiệu $\\frac{2}{4}$ là ký hiệu của...", a: "Nhịp $2/4$", b: "Nhịp $4/2$", c: "Tốc độ $2/4$", d: "Âm hình $2/4$", correct: 'A', id: "NL-B2" },
+                    { q: "Trong nhịp $2/4$, phách thứ nhất là phách gì?", a: "Phách mạnh", b: "Phách nhẹ", c: "Phách lửng", d: "Phách yếu", correct: 'A', id: "NL-B3" },
+                    { q: "Khuông nhạc dùng để làm gì?", a: "Để đựng nhạc cụ", b: "Để ghi chép các nốt nhạc", c: "Để đo tốc độ bài hát", d: "Để xác định độ ngân", correct: 'B', id: "NL-B4" },
+                    { q: "Nốt trắng có giá trị bằng bao nhiêu lần nốt đen?", a: "2 lần", b: "4 lần", c: "1/2 lần", d: "1 lần", correct: 'A', id: "NL-B5" },
+                    { q: "Dấu lặng đen có giá trị bằng bao nhiêu lần dấu lặng trắng?", a: "1/2 lần", b: "2 lần", c: "4 lần", d: "1/4 lần", correct: 'A', id: "NL-B6" },
+                    { q: "Khóa nhạc thông dụng nhất trong sách Âm nhạc 6 là khóa gì?", a: "Khóa Fa", b: "Khóa Đô", c: "Khóa Sol", d: "Khóa La", correct: 'C', id: "NL-B7" },
+                    { q: "Dấu nối dùng để làm gì?", a: "Làm mạnh âm thanh", b: "Nối hai nốt cùng cao độ thành một nốt ngân dài", c: "Nối hai nốt khác cao độ", d: "Ngắt âm thanh", correct: 'B', id: "NL-B8" },
+                    { q: "Trong nhịp $2/4$, một ô nhịp chỉ có thể chứa tối đa bao nhiêu nốt đen?", a: "1 nốt đen", b: "2 nốt đen", c: "3 nốt đen", d: "4 nốt đen", correct: 'B', id: "NL-B9" },
+                    { q: "Vạch nhịp đôi dùng để làm gì?", a: "Ngắt quãng bài hát", b: "Kết thúc một đoạn nhạc hoặc một bài nhạc", c: "Bắt đầu một đoạn nhạc mới", d: "Đánh dấu phách mạnh", correct: 'B', id: "NL-B10" }
+                ],
+                "Hiểu": [
+                    { q: "Trong nhịp $2/4$, nếu một nốt đen có giá trị là 1 phách, thì một nốt trắng chấm dôi có giá trị là bao nhiêu phách?", a: "2 phách", b: "3 phách", c: "1.5 phách", d: "4 phách", correct: 'B', id: "NL-H1" },
+                    { q: "Trong một đoạn nhạc nhịp $2/4$, sự kết hợp nào sau đây là ĐÚNG với một ô nhịp?", a: "1 nốt trắng và 1 nốt đen", b: "1 nốt đen và 3 nốt móc đơn", c: "2 nốt trắng", d: "4 nốt móc đơn", correct: 'D', id: "NL-H2" },
+                    { q: "Dấu chấm dôi được đặt bên cạnh nốt nhạc để làm gì?", a: "Làm nốt nhạc cao hơn", b: "Làm nốt nhạc ngân dài thêm một nửa giá trị của nó", c: "Làm nốt nhạc ngắn lại", d: "Làm nốt nhạc mạnh hơn", correct: 'B', id: "NL-H3" },
+                    { q: "Tại sao trong một bản nhạc, cần phải có vạch nhịp?", a: "Để phân chia độ dài bài hát", b: "Để phân chia các phách mạnh và phách nhẹ trong bài hát", c: "Để quy định tốc độ", d: "Để đánh dấu chỗ lấy hơi", correct: 'B', id: "NL-H4" },
+                    { q: "Thứ tự sắp xếp các nốt nhạc từ thấp đến cao trong quãng $8$ là gì?", a: "Đô, Rê, Mi, Fa, Son, La, Si, Đô", b: "Đô, Si, La, Son, Fa, Mi, Rê, Đô", c: "Rê, Mi, Fa, Son, La, Si, Đô, Rê", d: "Mi, Fa, Son, La, Si, Đô, Rê, Mi", correct: 'A', id: "NL-H5" }
+                ],
+                "Vận dụng": [
+                    { q: "Để tạo ra một ô nhịp $2/4$, bạn cần kết hợp một nốt đen và một nốt trắng chấm dôi (có chấm dôi) được không? Giải thích.", a: "Được, vì tổng là 3 phách", b: "Không, vì tổng là 3 phách, vượt quá $2$ phách của nhịp $2/4$", c: "Được, vì nốt trắng chấm dôi chỉ bằng 1 phách", d: "Không, vì nốt đen không thể đứng cạnh nốt chấm dôi", correct: 'B', id: "NL-V1" },
+                    { q: "Một đoạn nhạc nhịp $2/4$ bắt đầu bằng nốt Đô đen (phách 1) và tiếp theo là hai nốt Rê móc đơn. Hai nốt Rê móc đơn đó nằm ở phách nào?", a: "Phách 1", b: "Nửa phách 2", c: "Phách 2", d: "Nửa phách 1 và phách 2", correct: 'C', id: "NL-V2" },
+                    { q: "Nếu bạn thấy ký hiệu $p$ (piano) và $f$ (forte) trong một bản nhạc, bạn cần thể hiện bài hát như thế nào?", a: "Hát nhanh dần", b: "Hát chậm dần", c: "Hát nhẹ nhàng và hát mạnh mẽ", d: "Chuyển từ hát sang nói", correct: 'C', id: "NL-V3" },
+                    { q: "Để bài hát trở nên tha thiết và êm dịu, bạn có thể áp dụng thêm dấu nhạc nào?", a: "Dấu ngắt (staccato)", b: "Dấu luyến", c: "Dấu nhắc lại", d: "Dấu lặng đen", correct: 'B', id: "NL-V4" },
+                    { q: "Một đoạn nhạc kết thúc bằng một nốt trắng. Nếu bài hát ở nhịp $2/4$, nốt trắng này sẽ chiếm bao nhiêu ô nhịp?", a: "1 ô nhịp", b: "2 ô nhịp", c: "1/2 ô nhịp", d: "3/2 ô nhịp", correct: 'A', id: "NL-V5" }
+                ]
+            },
+            
+            "Tập đọc nhạc": {
+                "Biết": [
+                    { q: "Nốt nhạc nằm ở dòng kẻ thứ nhất của khuông nhạc (khóa Sol) là nốt gì?", a: "Mi", b: "Sol", c: "Si", d: "Rê", correct: 'A', id: "TĐN-B1" },
+                    { q: "Nốt nhạc nằm ở khe thứ nhất của khuông nhạc (khóa Sol) là nốt gì?", a: "Đô", b: "Fa", c: "Mi", d: "Son", correct: 'B', id: "TĐN-B2" },
+                    { q: "Trong các nốt Đô, Rê, Mi, Fa, Son, nốt nào có cao độ thấp nhất?", a: "Mi", b: "Đô", c: "Rê", d: "Son", correct: 'B', id: "TĐN-B3" },
+                    { q: "Nốt Son nằm ở dòng kẻ thứ mấy của khuông nhạc (khóa Sol)?", a: "Dòng kẻ 1", b: "Dòng kẻ 2", c: "Dòng kẻ 3", d: "Dòng kẻ 4", correct: 'B', id: "TĐN-B4" },
+                    { q: "Nốt nhạc nằm ở khe thứ ba của khuông nhạc (khóa Sol) là nốt gì?", a: "La", b: "Si", c: "Đô", d: "Rê", correct: 'C', id: "TĐN-B5" },
+                    { q: "Nốt Si nằm ở dòng kẻ thứ mấy của khuông nhạc (khóa Sol)?", a: "Dòng kẻ 3", b: "Dòng kẻ 4", c: "Dòng kẻ 5", d: "Dòng kẻ 2", correct: 'A', id: "TĐN-B6" },
+                    { q: "Tập đọc nhạc giúp chúng ta phát triển kỹ năng nào sau đây?", a: "Chơi nhạc cụ", b: "Nhận biết cao độ và trường độ qua ký hiệu", c: "Sáng tác nhạc", d: "Làm nhạc sĩ", correct: 'B', id: "TĐN-B7" },
+                    { q: "Nốt Rê nằm ở vị trí nào so với nốt Đô (dưới khuông)?", a: "Trên dòng kẻ phụ thứ nhất", b: "Dưới dòng kẻ phụ thứ nhất", c: "Trong khe thứ nhất", d: "Trên dòng kẻ thứ nhất", correct: 'A', id: "TĐN-B8" },
+                    { q: "Ký hiệu ngón tay thường được dùng trong Tập đọc nhạc để làm gì?", a: "Chỉ vị trí đứng", b: "Chỉ cách gõ nhịp", c: "Chỉ cách bấm phím hoặc vị trí ngón khi chơi nhạc cụ", d: "Chỉ cách lấy hơi", correct: 'C', id: "TĐN-B9" },
+                    { q: "Nốt La nằm ở khe thứ mấy của khuông nhạc (khóa Sol)?", a: "Khe thứ 2", b: "Khe thứ 3", c: "Khe thứ 4", d: "Khe thứ 1", correct: 'A', id: "TĐN-B10" }
+                ],
+                "Hiểu": [
+                    { q: "Trong các nhóm nốt Rê, Fa, La và Mi, Son, Si, nhóm nào chỉ gồm các nốt nằm trên dòng kẻ?", a: "Nhóm Rê, Fa, La", b: "Nhóm Mi, Son, Si", c: "Cả hai nhóm", d: "Không nhóm nào", correct: 'B', id: "TĐN-H1" },
+                    { q: "Nếu một nốt nhạc nằm ngay trên nốt Đô (dưới khuông) trên dòng kẻ phụ thứ nhất, đó là nốt gì?", a: "Nốt Mi", b: "Nốt Rê", c: "Nốt Fa", d: "Nốt Son", correct: 'B', id: "TĐN-H2" },
+                    { q: "Một đoạn nhạc gồm các nốt: Mi, Fa, Son, Fa. Nhận định nào sau đây về cao độ là đúng?", a: "Son có cao độ cao nhất", b: "Mi có cao độ cao nhất", c: "Tất cả các nốt có cao độ bằng nhau", d: "Fa có cao độ thấp nhất", correct: 'A', id: "TĐN-H3" },
+                    { q: "Khi Tập đọc nhạc, nếu bạn gặp một nốt móc đơn, bạn nên đọc nó như thế nào so với nốt đen?", a: "Nhanh gấp đôi", b: "Chậm gấp đôi", c: "Nhanh gấp bốn", d: "Bằng tốc độ", correct: 'A', id: "TĐN-H4" },
+                    { q: "Tại sao nốt Đô dưới khuông cần dùng gạch phụ?", a: "Vì nó là nốt đặc biệt", b: "Vì cao độ của nó nằm ngoài 5 dòng kẻ chính", c: "Vì nó là nốt thấp nhất", d: "Để phân biệt với nốt Đô cao", correct: 'B', id: "TĐN-H5" }
+                ],
+                "Vận dụng": [
+                    { q: "Cho dãy nốt nhạc (theo vị trí trên khuông): Dòng 1, Khe 1, Dòng 2. Dãy nốt đó lần lượt là gì?", a: "Mi, Fa, Son", b: "Mi, Sol, Si", c: "Fa, Sol, La", d: "Rê, Mi, Fa", correct: 'A', id: "TĐN-V1" },
+                    { q: "Nếu bạn muốn chuyển một đoạn nhạc từ thấp lên cao, bạn cần dịch chuyển các nốt nhạc lên trên hay xuống dưới khuông nhạc?", a: "Xuống dưới", b: "Lên trên", c: "Giữ nguyên vị trí", d: "Thay đổi khóa Sol", correct: 'B', id: "TĐN-V2" },
+                    { q: "Tên nốt nhạc nào thường dùng để bắt đầu cho các bài Tập đọc nhạc đơn giản ở lớp 6?", a: "Mi", b: "Đô", c: "Son", d: "La", correct: 'C', id: "TĐN-V3" },
+                    { q: "Để xác định nốt Fa trên khuông nhạc, bạn cần tìm nốt nằm ở khe thứ mấy?", a: "Khe thứ nhất", b: "Khe thứ hai", c: "Khe thứ ba", d: "Khe thứ tư", correct: 'A', id: "TĐN-V4" },
+                    { q: "Trong nhịp $2/4$, nếu bạn đọc nốt Mi đen và nốt Son đen, hai nốt đó sẽ chiếm tổng cộng bao nhiêu phách?", a: "1 phách", b: "2 phách", c: "3 phách", d: "4 phách", correct: 'B', id: "TĐN-V5" }
+                ]
+            },
+
+            "Âm nhạc thường thức": {
+                "Biết": [
+                    { q: "Nhạc cụ nào sau đây thuộc bộ gõ, thường dùng trong dàn nhạc dân tộc Việt Nam?", a: "Đàn tranh", b: "Đàn T'rưng", c: "Đàn bầu", d: "Đàn nhị", correct: 'B', id: "TT-B1" },
+                    { q: "Đàn bầu thuộc loại nhạc cụ nào về cách thức tạo âm thanh?", a: "Dây gẩy", b: "Dây kéo", c: "Dây độc huyền", d: "Hơi", correct: 'C', id: "TT-B2" },
+                    { q: "Đàn T'rưng là nhạc cụ truyền thống của dân tộc nào?", a: "Dân tộc Kinh", b: "Dân tộc Ê-đê, Gia-rai (Tây Nguyên)", c: "Dân tộc Thái", d: "Dân tộc Mông", correct: 'B', id: "TT-B3" },
+                    { q: "Dân ca là loại hình âm nhạc nào?", a: "Nhạc giao hưởng", b: "Những bài hát dân gian được truyền miệng qua nhiều thế hệ", c: "Nhạc hiện đại", d: "Nhạc cụ nước ngoài", correct: 'B', id: "TT-B4" },
+                    { q: "Trong Âm nhạc thường thức lớp 6, ta được giới thiệu về thể loại Hát nói của miền nào?", a: "Miền Nam", b: "Miền Trung", c: "Miền Bắc", d: "Tây Nguyên", correct: 'C', id: "TT-B5" },
+                    { q: "Nhạc cụ nào dưới đây tạo âm thanh bằng cách thổi?", a: "Đàn nhị", b: "Sáo trúc", c: "Trống", d: "Đàn tranh", correct: 'B', id: "TT-B6" },
+                    { q: "Chủ đề chính của hầu hết các bài dân ca là gì?", a: "Tình yêu thiên nhiên, lao động và cuộc sống", b: "Tình yêu vũ trụ", c: "Khoa học kỹ thuật", d: "Trò chơi điện tử", correct: 'A', id: "TT-B7" },
+                    { q: "Nhạc cụ nào có hộp cộng hưởng hình chữ nhật, tạo âm bằng cách gẩy dây?", a: "Đàn nhị", b: "Đàn nguyệt", c: "Đàn tranh", d: "Sáo", correct: 'C', id: "TT-B8" },
+                    { q: "Nhạc sĩ có vai trò gì trong âm nhạc?", a: "Là người biểu diễn chính", b: "Là người sáng tác ra các tác phẩm âm nhạc", c: "Là người nghe nhạc", d: "Là người bán vé", correct: 'B', id: "TT-B9" },
+                    { q: "Âm nhạc góp phần bồi dưỡng tình cảm, đạo đức cho con người là vai trò nào?", a: "Giải trí", b: "Giáo dục thẩm mĩ", c: "Thương mại", d: "Thể thao", correct: 'B', id: "TT-B10" }
+                ],
+                "Hiểu": [
+                    { q: "Sự khác biệt cơ bản giữa nhạc không lời (nhạc cụ) và ca khúc là gì?", a: "Tốc độ", b: "Có hay không có lời ca", c: "Cao độ", d: "Nhịp điệu", correct: 'B', id: "TT-H1" },
+                    { q: "Tại sao Đàn T'rưng được xếp vào nhạc cụ dân tộc của Tây Nguyên?", a: "Vì nó được làm bằng tre, nứa, vật liệu đặc trưng của vùng núi", b: "Vì nó là nhạc cụ có dây", c: "Vì nó tạo ra âm thanh nhẹ nhàng", d: "Vì nó là nhạc cụ có kích thước lớn", correct: 'A', id: "TT-H2" },
+                    { q: "Loại nhạc cụ dân tộc nào có khả năng diễn tả âm thanh đa dạng, giống giọng người hát nhất?", a: "Đàn nhị", b: "Sáo", c: "Đàn T'rưng", d: "Đàn bầu", correct: 'D', id: "TT-H3" },
+                    { q: "Khi nghe một bài dân ca, ta thường nhận ra đặc điểm gì về giai điệu và tiết tấu?", a: "Giai điệu rất phức tạp, tiết tấu hiện đại", b: "Giai điệu mộc mạc, tiết tấu đơn giản, mang âm hưởng địa phương", c: "Giai điệu ồn ào, tiết tấu nhanh", d: "Giai điệu buồn bã và đơn điệu", correct: 'B', id: "TT-H4" },
+                    { q: "Việc học Âm nhạc thường thức giúp học sinh lớp 6 đạt được mục đích gì?", a: "Biết cách chơi tất cả các nhạc cụ", b: "Mở rộng kiến thức về các loại hình âm nhạc, nhạc cụ và các nghệ sĩ", c: "Chỉ tập trung vào nhạc hiện đại", d: "Chỉ thuộc lời bài hát", correct: 'B', id: "TT-H5" }
+                ],
+                "Vận dụng": [
+                    { q: "Giả sử bạn cần tạo một bản nhạc nền vui tươi, mang âm hưởng dân tộc. Bạn nên chọn nhạc cụ nào là chủ đạo?", a: "Đàn piano và violin", b: "Sáo trúc và Đàn T'rưng", c: "Kèn saxophone và guitar điện", d: "Trống jazz và bass", correct: 'B', id: "TT-V1" },
+                    { q: "Nếu bạn nghe một bài hát có nội dung ca ngợi tình yêu quê hương, đất nước, nhiều khả năng bài hát đó thuộc thể loại nào?", a: "Nhạc rock", b: "Nhạc giao hưởng", c: "Ca khúc cách mạng hoặc dân ca", d: "Nhạc pop Hàn Quốc", correct: 'C', id: "TT-V2" },
+                    { q: "Trong bối cảnh hòa nhạc dân tộc, vai trò của Đàn Tranh thường là gì?", a: "Duy trì tiết tấu", b: "Đóng vai trò bè trầm", c: "Đóng vai trò độc tấu hoặc bè hòa tấu uyển chuyển", d: "Chỉ dùng để trang trí", correct: 'C', id: "TT-V3" },
+                    { q: "Âm nhạc thường thức giúp bạn có thể hiểu rõ hơn về văn hóa của một vùng miền qua yếu tố nào?", a: "Qua lời bài hát và làn điệu dân ca", b: "Qua độ dài bài hát", c: "Qua trang phục của nhạc sĩ", d: "Qua giá bán đĩa nhạc", correct: 'A', id: "TT-V4" },
+                    { q: "Nếu bạn muốn sáng tác một ca khúc, bước đầu tiên quan trọng nhất là gì?", a: "Mua một cây đàn piano đắt tiền", b: "Xây dựng ý tưởng, chủ đề và viết lời ca", c: "Thu âm ngay lập tức", d: "Tìm người hòa âm phối khí", correct: 'B', id: "TT-V5" }
+                ]
+            },
+
+            "Nghe và Đoán": {
+                "Biết": [
+                    { q: "Bài hát 'Tiếng Chuông và Ngọn Cờ' có nội dung chính là gì?", a: "Ca ngợi vẻ đẹp thiên nhiên", b: "Khát vọng hòa bình và đoàn kết", c: "Tình cảm gia đình", d: "Trò chơi dân gian", correct: 'B', id: "ND-B1" },
+                    { q: "Bài hát 'Em Vẫn Nhớ Trường Xưa' thường gợi lên cảm xúc gì?", a: "Vui tươi, rộn rã", b: "Tự hào, hùng tráng", c: "Lưu luyến, nhớ nhung", d: "Buồn bã, cô đơn", correct: 'C', id: "ND-B2" },
+                    { q: "Bài 'Lý Cây Đa' (Dân ca quan họ Bắc Ninh) thường được hát với tốc độ như thế nào?", a: "Nhanh, mạnh", b: "Vừa phải, tha thiết", c: "Rất chậm, buồn bã", d: "Cực nhanh, dồn dập", correct: 'B', id: "ND-B3" },
+                    { q: "Trong chương trình Âm nhạc 6 Cánh Diều, bài hát nào có nhắc đến hình ảnh ngôi trường?", a: "Tiếng Chuông và Ngọn Cờ", b: "Bàn Tay Mẹ", c: "Em Vẫn Nhớ Trường Xưa", d: "Lý Cây Đa", correct: 'C', id: "ND-B4" },
+                    { q: "Tiết tấu của đoạn nhạc có nhiều nốt móc đơn và móc kép thường tạo cảm giác gì?", a: "Chậm rãi, khoan thai", b: "Nhanh, rộn ràng", c: "Buồn bã, nặng nề", d: "Êm dịu, nhẹ nhàng", correct: 'B', id: "ND-B5" },
+                    { q: "Nếu bạn nghe thấy âm thanh của đàn bầu, bạn sẽ cảm nhận được đặc điểm nào nổi bật?", a: "Âm thanh trầm và hùng tráng", b: "Âm thanh cao, rõ ràng, nhiều kỹ thuật rung luyến", c: "Âm thanh dồn dập như tiếng trống", d: "Âm thanh sắc bén, chói tai", correct: 'B', id: "ND-B6" },
+                    { q: "Âm thanh của đàn T'rưng thường gợi lên hình ảnh về vùng đất nào?", a: "Vùng đồng bằng sông Hồng", b: "Vùng núi cao Tây Nguyên", c: "Vùng biển đảo", d: "Vùng thành thị", correct: 'B', id: "ND-B7" },
+                    { q: "Khi nghe một bài dân ca ru con, ta cảm nhận được nhịp điệu thường là gì?", a: "Nhịp $2/4$ nhanh", b: "Nhịp tự do, chậm rãi, nhẹ nhàng", c: "Nhịp $4/4$ dồn dập", d: "Nhịp $3/4$ hùng tráng", correct: 'B', id: "ND-B8" },
+                    { q: "Bài hát 'Tiếng Chuông và Ngọn Cờ' được thể hiện với tính chất gì?", a: "Vui tươi, hồn nhiên", b: "Trang nghiêm, hùng tráng", c: "Buồn bã, tiếc nuối", d: "Lãng mạn, nhẹ nhàng", correct: 'A', id: "ND-B9" },
+                    { q: "Đoạn nhạc nào sử dụng nhiều nốt trắng và nốt tròn sẽ tạo cảm giác gì về trường độ?", a: "Nhanh và gấp gáp", b: "Dài và ngân vang", c: "Nhẹ và êm dịu", d: "Mạnh và dứt khoát", correct: 'B', id: "ND-B10" }
+                ],
+                "Hiểu": [
+                    { q: "Điểm chung về nội dung giữa bài 'Tiếng Chuông và Ngọn Cờ' và 'Lý Cây Đa' là gì?", a: "Cùng ca ngợi mẹ", b: "Cùng ca ngợi học sinh", c: "Cùng mang tính chất giáo dục, hướng tới cái đẹp", d: "Cùng được sáng tác bởi một nhạc sĩ", correct: 'C', id: "ND-H1" },
+                    { q: "Tại sao âm thanh của Sáo Trúc thường được dùng để diễn tả cảnh thiên nhiên tươi đẹp?", a: "Vì sáo có âm thanh mạnh mẽ", b: "Vì sáo có âm thanh trong trẻo, du dương", c: "Vì sáo có âm thanh trầm", d: "Vì sáo dễ mang theo", correct: 'B', id: "ND-H2" },
+                    { q: "Khi nghe một đoạn nhạc, nếu bạn nghe nhiều dấu luyến, dấu nối, bạn nhận định giai điệu đó có tính chất gì?", a: "Ngắt quãng, dứt khoát", b: "Liền mạch, uyển chuyển, tình cảm", c: "Nhanh, vui vẻ", d: "Chậm, buồn bã", correct: 'B', id: "ND-H3" },
+                    { q: "Nếu một đoạn nhạc có nhịp độ 'Moderato' (vừa phải), bạn nên biểu diễn với tốc độ như thế nào?", a: "Rất nhanh", b: "Hơi chậm", c: "Trung bình, không quá nhanh, không quá chậm", d: "Cực kỳ chậm", correct: 'C', id: "ND-H4" },
+                    { q: "Đoạn nhạc nào thường được sử dụng âm hình tiết tấu $1$ đen - $2$ móc đơn?", a: "Âm nhạc ru con", b: "Âm nhạc hành khúc", c: "Âm nhạc khiêu vũ", d: "Âm nhạc giao hưởng", correct: 'B', id: "ND-H5" }
+                ],
+                "Vận dụng": [
+                    { q: "Nếu bạn muốn thể hiện bài 'Em Vẫn Nhớ Trường Xưa' với cảm xúc sâu lắng nhất, bạn nên nhấn mạnh vào yếu tố nào?", a: "Tăng âm lượng lên tối đa", b: "Hát chậm lại ở những nốt ngân dài, sử dụng sắc thái mềm mại", c: "Hát với tốc độ nhanh nhất có thể", d: "Chỉ hát lời 1", correct: 'B', id: "ND-V1" },
+                    { q: "Khi nghe một bản độc tấu Đàn Bầu, điều gì khiến bạn liên tưởng đến giọng hát của con người?", a: "Sự thô ráp của âm thanh", b: "Khả năng rung, luyến láy, tạo ra nhiều âm sắc", c: "Âm thanh cực kỳ lớn", d: "Khả năng chơi nhanh như sáo", correct: 'B', id: "ND-V2" },
+                    { q: "Để phân biệt bài hát ru con với bài hát thiếu nhi, bạn cần chú ý nhất đến yếu tố nào?", a: "Lời ca", b: "Tiết tấu và tính chất âm nhạc", c: "Tác giả", d: "Số lượng người hát", correct: 'B', id: "ND-V3" },
+                    { q: "Một đoạn nhạc không lời sử dụng nhiều nhạc cụ dây (như violon, violoncello) thường mang lại cảm giác gì?", a: "Mạnh mẽ, thô bạo", b: "Êm ái, giàu cảm xúc, bay bổng", c: "Vui nhộn, hài hước", d: "Tối tăm, ghê rợn", correct: 'B', id: "ND-V4" },
+                    { q: "Nếu bạn nghe một bài hát có sử dụng nhịp $3/4$, bạn sẽ nhận thấy bài hát đó thường có tính chất gì?", a: "Hành khúc hoặc sôi nổi", b: "Mềm mại, uyển chuyển (nhảy van-xơ, điệu luân vũ)", c: "Dồn dập, gấp gáp", d: "Thô cứng, đều đặn", correct: 'B', id: "ND-V5" }
+                ]
+            },
+
+            "Nghệ sĩ": {
+                "Biết": [
+                    { q: "Nhạc sĩ nào là tác giả bài hát 'Tiếng Chuông và Ngọn Cờ'?", a: "Phạm Tuyên", b: "Trần Long Ẩn", c: "Hoàng Vân", d: "Văn Cao", correct: 'A', id: "NS-B1" },
+                    { q: "Tác giả của bài hát 'Em Vẫn Nhớ Trường Xưa' là ai?", a: "Thanh Hải", b: "Trương Quang Lục", c: "Văn Chung", d: "Phạm Tuyên", correct: 'B', id: "NS-B2" },
+                    { q: "Nhạc sĩ Hoàng Vân nổi tiếng với thể loại âm nhạc nào?", a: "Nhạc Pop", b: "Ca khúc thiếu nhi và nhạc cách mạng", c: "Nhạc Rap", d: "Nhạc Jazz", correct: 'B', id: "NS-B3" },
+                    { q: "Nhạc sĩ Phạm Tuyên nổi tiếng với thể loại âm nhạc nào?", a: "Nhạc rock", b: "Nhạc không lời", c: "Nhạc thiếu nhi và nhạc cách mạng", d: "Dân ca", correct: 'C', id: "NS-B4" },
+                    { q: "Nhạc sĩ Trương Quang Lục là người nổi tiếng với nhiều ca khúc dành cho đối tượng nào?", a: "Người lớn tuổi", b: "Thiếu nhi", c: "Ca sĩ nhạc Pop", d: "Nhà khoa học", correct: 'B', id: "NS-B5" },
+                    { q: "Nhạc sĩ nào đã sáng tác bài 'Mái Đình Làng Biển' (tham khảo trong sách)?", a: "Nguyễn Tài Tuệ", b: "Nguyễn Đình Tấn", c: "Nguyễn Đức Toàn", d: "Nguyễn Văn Tý", correct: 'B', id: "NS-B6" },
+                    { q: "Nhạc sĩ Trần Long Ẩn có nhiều đóng góp trong thời kỳ nào của âm nhạc Việt Nam?", a: "Âm nhạc trước năm 1945", b: "Âm nhạc thời kỳ kháng chiến chống Mỹ", c: "Âm nhạc thập niên 2000", d: "Âm nhạc thế kỷ $18$", correct: 'B', id: "NS-B7" },
+                    { q: "Ai là nhạc sĩ được mệnh danh là 'Ông vua nhạc thiếu nhi'?", a: "Văn Cao", b: "Phạm Tuyên", c: "Trịnh Công Sơn", d: "Thuận Yến", correct: 'B', id: "NS-B8" },
+                    { q: "Ngoài sáng tác, nhạc sĩ còn có thể giữ vai trò nào khác trong âm nhạc?", a: "Người mẫu thời trang", b: "Chỉ huy dàn nhạc hoặc làm nhà nghiên cứu", c: "Vận động viên thể thao", d: "Thợ may", correct: 'B', id: "NS-B9" },
+                    { q: "Bài hát nào của nhạc sĩ Phạm Tuyên được sử dụng làm ca khúc chính thức trong một sự kiện lớn của thiếu nhi Việt Nam?", a: "Cùng nhau ta đi lên", b: "Tiến lên đoàn viên", c: "Chiến thắng Điện Biên", d: "Bàn tay mẹ", correct: 'A', id: "NS-B10" }
+                ],
+                "Hiểu": [
+                    { q: "Sự khác biệt lớn nhất giữa nhạc sĩ và ca sĩ là gì?", a: "Ca sĩ luôn giàu hơn nhạc sĩ", b: "Nhạc sĩ sáng tác, ca sĩ biểu diễn", c: "Nhạc sĩ chỉ chơi nhạc cụ, ca sĩ chỉ hát", d: "Ca sĩ luôn nổi tiếng hơn nhạc sĩ", correct: 'B', id: "NS-H1" },
+                    { q: "Khi nghiên cứu về nhạc sĩ Phạm Tuyên, ta thấy các tác phẩm của ông thường mang tính chất gì?", a: "Lãng mạn, cá nhân", b: "Hào hùng, vui tươi, dễ thuộc, mang tính tập thể", c: "Trừu tượng, khó hiểu", d: "Buồn bã, bi kịch", correct: 'B', id: "NS-H2" },
+                    { q: "Tại sao nhạc sĩ Trương Quang Lục có nhiều ca khúc dành cho thiếu nhi?", a: "Ông chỉ thích trẻ con", b: "Ông hiểu tâm lí, ngôn ngữ và các chủ đề gần gũi với trẻ thơ", c: "Ông không biết sáng tác nhạc cho người lớn", d: "Ông chỉ viết nhạc sau khi nghỉ hưu", correct: 'B', id: "NS-H3" },
+                    { q: "Vai trò 'Nghệ sĩ' trong âm nhạc bao gồm những ai?", a: "Chỉ người hát", b: "Người sáng tác, người biểu diễn, người chỉ huy", c: "Chỉ người chơi đàn", d: "Chỉ người quản lý", correct: 'B', id: "NS-H4" },
+                    { q: "Để được coi là một 'Nghệ sĩ' thành công, điều quan trọng nhất là gì?", a: "Có ngoại hình đẹp", b: "Có tác phẩm/sự nghiệp có giá trị nghệ thuật và được công chúng đón nhận", c: "Chơi được nhiều nhạc cụ", d: "Thuộc hết các nốt nhạc", correct: 'B', id: "NS-H5" }
+                ],
+                "Vận dụng": [
+                    { q: "Nếu bạn là một nhạc sĩ, bạn sẽ chọn chủ đề gì để sáng tác một ca khúc thiếu nhi $6$ tuổi?", a: "Chiến tranh và hòa bình", b: "Gia đình, bạn bè và trường học", c: "Nghiên cứu khoa học vũ trụ", d: "Kinh tế thị trường", correct: 'B', id: "NS-V1" },
+                    { q: "Nhạc sĩ Phạm Tuyên thường sử dụng nhịp điệu nào trong các ca khúc thiếu nhi của mình để tạo sự vui tươi, dễ hát?", a: "Nhịp $2/4$ hoặc $4/4$ với tiết tấu rõ ràng", b: "Nhịp tự do, chậm rãi", c: "Nhịp $12/8$ phức tạp", d: "Nhịp điệu rock mạnh mẽ", correct: 'A', id: "NS-V2" },
+                    { q: "Khi tìm hiểu về một nghệ sĩ, bạn sẽ tìm hiểu thông tin nào đầu tiên để hiểu rõ phong cách âm nhạc của họ?", a: "Quê quán và năm sinh", b: "Các tác phẩm tiêu biểu và thể loại sáng tác", c: "Chiều cao và cân nặng", d: "Các món ăn yêu thích", correct: 'B', id: "NS-V3" },
+                    { q: "Một nghệ sĩ thường phải làm gì để tác phẩm của mình được nhiều người biết đến?", a: "Giấu tác phẩm đi", b: "Tham gia biểu diễn, công bố, phát hành tác phẩm một cách rộng rãi", c: "Chỉ cho bạn bè nghe", d: "Đốt tác phẩm", correct: 'B', id: "NS-V4" },
+                    { q: "Vai trò của nhạc sĩ trong việc bảo tồn văn hóa là gì?", a: "Không có vai trò gì", b: "Sáng tác các tác phẩm mới dựa trên chất liệu dân ca truyền thống", c: "Sao chép nhạc nước ngoài", d: "Chỉ viết nhạc Pop", correct: 'B', id: "NS-V5" }
+                ]
+            },
+            
+            "Học hát": {
+                "Biết": [
+                    { q: "Bài hát 'Lý Cây Đa' thuộc làn điệu dân ca nào của Việt Nam?", a: "Dân ca Hò Huế", b: "Dân ca quan họ Bắc Ninh", c: "Dân ca Nam Bộ", d: "Dân ca Tây Bắc", correct: 'B', id: "HH-B1" },
+                    { q: "Trước khi hát một bài hát, việc làm nào sau đây là quan trọng nhất?", a: "Uống nước ngọt", b: "Luyện thanh và lấy hơi đúng cách", c: "Nghe nhạc rock", d: "Chơi game", correct: 'B', id: "HH-B2" },
+                    { q: "Khi hát, việc mở khẩu hình miệng to và tròn giúp đạt được điều gì?", a: "Giúp hát sai lời", b: "Giúp âm thanh phát ra to, rõ ràng và vang hơn", c: "Giúp hát nhanh hơn", d: "Giúp giọng hát nhỏ lại", correct: 'B', id: "HH-B3" },
+                    { q: "Bài 'Lý Cây Đa' thường được biểu diễn theo phong cách nào?", a: "Solo (đơn ca)", b: "Hợp xướng phức tạp", c: "Đối đáp nam nữ (Quan họ)", d: "Rap", correct: 'C', id: "HH-B4" },
+                    { q: "Khi hát các nốt ngân dài, bạn cần chú ý đến kỹ thuật nào?", a: "Giữ hơi thở yếu", b: "Dùng hơi thở để giữ vững và làm đẹp nốt ngân", c: "Ngắt quãng liên tục", d: "Hát thật to", correct: 'B', id: "HH-B5" },
+                    { q: "Trong bài 'Em Vẫn Nhớ Trường Xưa', lời ca chủ yếu thể hiện tình cảm gì?", a: "Vui mừng khi nghỉ hè", b: "Sự lưu luyến, biết ơn và nhớ về thầy cô, bạn bè, mái trường", c: "Sự giận dỗi", d: "Niềm vui chiến thắng", correct: 'B', id: "HH-B6" },
+                    { q: "Việc đánh nhịp khi hát có tác dụng gì?", a: "Làm đau tay", b: "Giúp xác định phách mạnh, phách nhẹ và giữ đúng tốc độ", c: "Thay đổi lời bài hát", d: "Làm nốt nhạc cao hơn", correct: 'B', id: "HH-B7" },
+                    { q: "Trong bài hát, chỗ nào có ký hiệu dấu lặng, ta phải làm gì?", a: "Hát to lên", b: "Ngân dài nốt trước đó", c: "Ngừng ngân, nghỉ hoặc lấy hơi nhanh", d: "Đọc lời bài hát", correct: 'C', id: "HH-B8" },
+                    { q: "Trong bài 'Tiếng Chuông và Ngọn Cờ', câu hát nào thể hiện khát vọng hòa bình?", a: "Chúng em ca hát", b: "Tiếng chuông ngân vang, tiếng cờ bay trong gió", c: "Cầu cho trái đất không còn chiến tranh", d: "Ta cùng lên đường", correct: 'C', id: "HH-B9" },
+                    { q: "Trước khi hát, nên khởi động bằng cách làm gì?", a: "Uống rượu", b: "Luyện thanh, nhún nhảy nhẹ nhàng", c: "Ngủ một giấc", d: "Ăn thật nhiều đồ lạnh", correct: 'B', id: "HH-B10" }
+                ],
+                "Hiểu": [
+                    { q: "Để thể hiện đúng tính chất hồn nhiên, vui tươi của bài 'Tiếng Chuông và Ngọn Cờ', bạn nên hát với sắc thái nào?", a: "Trầm lắng, buồn bã", b: "Trong sáng, tươi vui, tốc độ hơi nhanh", c: "Uyển chuyển, tha thiết", d: "Hùng hồn, trang nghiêm", correct: 'B', id: "HH-H1" },
+                    { q: "Khi hát một bài dân ca như 'Lý Cây Đa', bạn cần chú ý đến điều gì để giữ được nét truyền thống?", a: "Tự ý thay đổi giai điệu", b: "Giữ nguyên lề lối, sử dụng kỹ thuật luyến láy mang âm hưởng dân tộc", c: "Thêm nhạc cụ điện tử hiện đại", d: "Hát bằng tiếng Anh", correct: 'B', id: "HH-H2" },
+                    { q: "Học hát giúp rèn luyện kỹ năng cảm thụ âm nhạc như thế nào?", a: "Giúp bạn nghe và cảm nhận được sự khác biệt về cao độ, trường độ, sắc thái của bài hát", b: "Giúp bạn trở thành ca sĩ ngay lập tức", c: "Giúp bạn quên đi các nốt nhạc", d: "Giúp bạn thuộc lòng các nhạc sĩ", correct: 'A', id: "HH-H3" },
+                    { q: "Khi hát, tại sao cần phải 'Lấy hơi' (hít hơi) ở những chỗ ngắt nghỉ phù hợp?", a: "Để nghỉ ngơi giữa chừng", b: "Để có đủ hơi cho câu hát tiếp theo, giúp câu hát không bị đứt đoạn giữa chừng", c: "Để tạo ra âm thanh lớn hơn", d: "Để tạo hiệu ứng vang", correct: 'B', id: "HH-H4" },
+                    { q: "Bài hát nào trong chương trình thể hiện tình cảm gắn bó với quê hương, làng xóm (gần gũi với dân ca)?", a: "Tiếng Chuông và Ngọn Cờ", b: "Lý Cây Đa", c: "Em Vẫn Nhớ Trường Xưa", d: "Nghệ sĩ", correct: 'B', id: "HH-H5" }
+                ],
+                "Vận dụng": [
+                    { q: "Trong câu hát 'Tiếng chuông ngân vang... tiếng cờ bay trong gió', từ 'ngân vang' nên được hát như thế nào?", a: "Hát ngắn, dứt khoát", b: "Ngân dài, sử dụng kỹ thuật rung nhẹ để tạo cảm giác vang vọng", c: "Hát thì thầm", d: "Hát với tốc độ rất nhanh", correct: 'B', id: "HH-V1" },
+                    { q: "Nếu bạn hát bài 'Lý Cây Đa' mà không luyến láy, bài hát sẽ bị mất đi tính chất nào?", a: "Tính chất hùng tráng", b: "Tính chất du dương, mềm mại và dân tộc", c: "Tính chất nhanh, sôi nổi", d: "Tính chất ồn ào", correct: 'B', id: "HH-V2" },
+                    { q: "Để đảm bảo giọng hát của bạn không bị mệt khi hát một bài dài, bạn cần làm gì trong quá trình hát?", a: "Cố gắng nín thở lâu nhất có thể", b: "Lấy hơi sâu và đủ, kiểm soát hơi thở một cách điều độ", c: "Vừa hát vừa chạy nhảy", d: "Uống nhiều nước đá", correct: 'B', id: "HH-V3" },
+                    { q: "Khi hát một ca khúc buồn, bạn nên sử dụng sắc thái và tốc độ như thế nào?", a: "Sắc thái mạnh, tốc độ nhanh", b: "Sắc thái nhẹ, tốc độ chậm rãi, trữ tình", c: "Sắc thái trung bình, tốc độ vừa", d: "Sắc thái ồn ào, tốc độ rất nhanh", correct: 'B', id: "HH-V4" },
+                    { q: "Khi hát bè, điều quan trọng nhất cần phải đạt được là gì?", a: "Hát to hơn bè bạn", b: "Hát khác nhịp điệu với bè bạn", c: "Hòa quyện, giữ đúng cao độ và tiết tấu của bè mình", d: "Không cần nghe bè khác", correct: 'C', id: "HH-V5" }
+                ]
+            }
+        };
+
+
+        // --- HÀM HỖ TRỢ VÀ CHỌN CÂU HỎI ---
+        /**
+         * Lấy một câu hỏi ngẫu nhiên dựa trên độ khó và chủ đề.
+         * @param {string} difficulty - Mức độ: "Biết", "Hiểu", "Vận dụng".
+         * @param {string} subjectFilter - Chủ đề cụ thể (chỉ dùng khi quay trúng WILD).
+         */
+        function getRandomQuestion(difficulty = 'Biết', subjectFilter = null) {
+            let availableSubjects = [];
+            
+            if (subjectFilter && QUESTIONS[subjectFilter] && QUESTIONS[subjectFilter][difficulty] && QUESTIONS[subjectFilter][difficulty].length > 0) {
+                // Ưu tiên chọn chủ đề nếu có lọc và còn câu hỏi
+                availableSubjects = [subjectFilter];
+            } else {
+                // Lọc tất cả các chủ đề còn câu hỏi ở mức độ hiện tại
+                availableSubjects = SUBJECTS.filter(s => QUESTIONS[s] && QUESTIONS[s][difficulty] && QUESTIONS[s][difficulty].length > 0);
+            }
+
+            if (availableSubjects.length === 0) {
+                // TH1: Chủ đề được lọc (WILD) đã hết câu hỏi, chuyển sang tìm ngẫu nhiên
+                if (subjectFilter) {
+                     console.warn(`Chủ đề "${subjectFilter}" đã hết câu hỏi Vận dụng. Chuyển sang chủ đề ngẫu nhiên.`);
+                     availableSubjects = SUBJECTS.filter(s => QUESTIONS[s] && QUESTIONS[s][difficulty] && QUESTIONS[s][difficulty].length > 0);
+                }
+                
+                // TH2: Nếu vẫn hết (hoặc ban đầu đã hết) ở mức độ này, thử tìm ở mức độ khác
+                if (availableSubjects.length === 0) {
+                    for (let i = 0; i < DIFFICULTIES.length; i++) {
+                        const fallbackDifficulty = DIFFICULTIES[i];
+                        const fallbackSubjects = SUBJECTS.filter(s => QUESTIONS[s] && QUESTIONS[s][fallbackDifficulty] && QUESTIONS[s][fallbackDifficulty].length > 0);
+                        if (fallbackSubjects.length > 0) {
+                            return getRandomQuestion(fallbackDifficulty); // Gọi lại chính nó với mức độ khác
+                        }
+                    }
+                    console.error("Không còn bất kỳ câu hỏi nào trong kho dữ liệu.");
+                    return null;
+                }
+            }
+
+            // Chọn ngẫu nhiên một chủ đề từ danh sách có sẵn
+            const randomSubject = availableSubjects[Math.floor(Math.random() * availableSubjects.length)];
+            const questionsPool = QUESTIONS[randomSubject][difficulty];
+            
+            // Chọn và xóa câu hỏi
+            const qIndex = Math.floor(Math.random() * questionsPool.length);
+            const question = questionsPool[qIndex];
+            questionsPool.splice(qIndex, 1);
+
+            return { question, subject: randomSubject, difficulty };
+        }
+
+        // --- HÀM VẼ BẢNG XẾP HẠNG ---
+        function renderLeaderboard() {
+            // Sắp xếp giảm dần theo điểm số
+            const sortedTeams = [...teams].sort((a, b) => b.score - a.score);
+
+            leaderboardBody.innerHTML = sortedTeams.map((team, index) => {
+                const isActive = team.id === teams[activeTeamIndex].id;
+                const rowClass = isActive ? 'active-turn font-semibold' : 'bg-white hover:bg-gray-50';
+                
+                return `
+                    <tr class="${rowClass} transition duration-150 ease-in-out">
+                        <td class="px-4 py-3 text-center text-lg font-extrabold 
+                            ${index === 0 ? 'text-yellow-600' : 'text-gray-700'} 
+                            ${index === 1 ? 'text-gray-500' : ''}
+                            ${index === 2 ? 'text-red-500' : ''}">
+                            ${index + 1}
+                        </td>
+                        <td class="px-4 py-3 font-medium flex items-center">
+                            <span class="w-4 h-4 rounded-full mr-2 shadow-md" style="background-color: ${team.color}; border: 1px solid #ccc;"></span>
+                            ${team.name}
+                        </td>
+                        <td class="px-4 py-3 text-center text-xl font-extrabold text-indigo-600">${team.score}</td>
+                    </tr>
+                `;
+            }).join('');
+            currentTeamNameSpan.textContent = teams[activeTeamIndex].name;
+        }
+
+
+        // --- HÀM VẼ VÒNG QUAY ---
+        function drawWheel() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(rotation);
+
+            for (let i = 0; i < numSegments; i++) {
+                const startAngle = i * segmentAngle;
+                const endAngle = (i + 1) * segmentAngle;
+
+                // 1. Vẽ ô
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, radius, startAngle, endAngle);
+                ctx.closePath();
+                ctx.fillStyle = segments[i].color;
+                ctx.fill();
+                
+                // 2. Vẽ đường viền
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // 3. Vẽ chữ (Phần thưởng)
+                ctx.save();
+                ctx.rotate(startAngle + segmentAngle / 2);
+                
+                ctx.fillStyle = (segments[i].color === "#f1c40f" || segments[i].color === "#2ecc71") ? "#34495e" : "#ffffff";
+                ctx.font = 'bold 18px Inter'; 
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                
+                const text = segments[i].text;
+                if (text.includes("NGÔI SAO") || text.includes("MẤT LƯỢT")) {
+                    const parts = text.split(' ');
+                    ctx.fillText(parts[0], radius * 0.9, -12);
+                    ctx.fillText(parts.slice(1).join(' '), radius * 0.9, 12);
+                } else {
+                    ctx.fillText(text, radius * 0.9, 0);
+                }
+
+                ctx.restore();
+            }
+
+            // Vẽ tâm (Center circle)
+            ctx.beginPath();
+            ctx.arc(0, 0, 30, 0, 2 * Math.PI); 
+            ctx.fillStyle = "#ff5722";
+            ctx.fill();
+            ctx.strokeStyle = "#ffffff";
+            ctx.lineWidth = 5;
+            ctx.stroke();
+
+            ctx.restore();
+        }
+
+        // --- LOGIC QUAY VÀ TÍNH KẾT QUẢ ---
+        function spin() {
+            if (spinning) return;
+
+            resultText.textContent = 'Đang quay...';
+            resultText.classList.remove('text-red-600', 'text-green-600', 'text-yellow-600');
+            resultText.classList.add('text-gray-500');
+
+            // 1. Chọn ô thắng ngẫu nhiên
+            targetSegment = Math.floor(Math.random() * numSegments);
+
+            // 2. Tính toán góc dừng
+            const targetRotation = 2 * Math.PI - (targetSegment * segmentAngle + segmentAngle / 2);
+
+            // 3. Đặt tốc độ quay ban đầu lớn (khoảng 10-15 vòng)
+            const extraSpins = Math.PI * 2 * (10 + Math.random() * 5);
+            const finalRotation = extraSpins + targetRotation;
+
+            // 4. Khởi tạo trạng thái quay
+            spinning = true;
+            spinButton.disabled = true;
+            
+            const duration = 5000; 
+            const startTime = performance.now();
+            
+            function animate(currentTime) {
+                const elapsedTime = currentTime - startTime;
+                const progress = Math.min(1, elapsedTime / duration); 
+
+                const easing = 1 - Math.pow(1 - progress, 3);
+                
+                rotation = (finalRotation * easing) % (2 * Math.PI);
+
+                drawWheel();
+                
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    endSpin();
+                }
+            }
+
+            requestAnimationFrame(animate);
+        }
+        
+        // --- HÀM KẾT THÚC QUAY VÀ XỬ LÝ QUÀ/CÂU HỎI ---
+        function endSpin() {
+            spinning = false;
+            spinButton.disabled = true; // Vẫn khóa nút cho đến khi trả lời xong
+
+            const winningSegment = segments[targetSegment];
+            const winningText = winningSegment.text;
+            
+            resultText.textContent = winningText;
+
+            // Đổi màu kết quả
+            if (winningText === "MẤT LƯỢT") {
+                resultText.classList.remove('text-gray-500', 'text-green-600', 'text-yellow-600');
+                resultText.classList.add('text-red-600');
+                // Xử lý mất lượt: chỉ cần chuyển lượt
+                setTimeout(moveToNextTurn, 1500);
+            } else if (winningText === "X2 ĐIỂM") {
+                 resultText.classList.remove('text-gray-500', 'text-green-600', 'text-red-600');
+                resultText.classList.add('text-yellow-600');
+                // X2 điểm là điểm Hiểu (50 điểm cơ bản * 2)
+                currentPoints = 50; 
+                presentQuestion('Hiểu'); 
+            } else if (winningText === "NGÔI SAO HI VỌNG") {
+                resultText.classList.remove('text-gray-500', 'text-green-600', 'text-red-600');
+                resultText.classList.add('text-yellow-600');
+                // Mức điểm cơ bản cho Vận dụng (WILD)
+                currentPoints = 80; 
+                showWILDChoiceModal(); // Hiển thị modal chọn quyền năng
+            } else {
+                // Ô điểm thường (10, 20, 30 điểm)
+                resultText.classList.remove('text-gray-500', 'text-red-600', 'text-yellow-600');
+                resultText.classList.add('text-green-600');
+                currentPoints = winningSegment.value;
+                // Điểm thường là mức độ Biết
+                presentQuestion('Biết'); 
+            }
+        }
+        
+        // --- LOGIC XỬ LÝ WILD ---
+        function showWILDChoiceModal() {
+            wildTeamNameSpan.textContent = teams[activeTeamIndex].name;
+            wildChoiceModal.style.display = 'flex';
+        }
+
+        window.handleWILDChoice = function(choice) {
+            wildChoiceModal.style.display = 'none';
+            // currentPoints = 80 (đã set trong endSpin)
+
+            if (choice === 1) { // Chiến lược - Chọn Chủ đề
+                showSubjectSelectModal();
+            } else if (choice === 2) { // Cơ hội - Đặt Cược
+                // isGamble = true để kích hoạt logic CƯỚP ĐIỂM trong handleAnswer
+                presentQuestion('Vận dụng', null, true); 
+            }
+        }
+
+        function showSubjectSelectModal() {
+            subjectSelectTeamNameSpan.textContent = teams[activeTeamIndex].name;
+            subjectOptionsContainer.innerHTML = '';
+
+            SUBJECTS.forEach(subject => {
+                const btn = document.createElement('button');
+                btn.className = 'option-button bg-indigo-500 text-white hover:bg-indigo-600 transition-colors';
+                btn.textContent = subject;
+                btn.onclick = () => {
+                    subjectSelectModal.style.display = 'none';
+                    // Chiến lược: Chỉ cần gọi presentQuestion với chủ đề đã chọn
+                    presentQuestion('Vận dụng', subject, false); 
+                };
+                subjectOptionsContainer.appendChild(btn);
+            });
+
+            subjectSelectModal.style.display = 'flex';
+        }
+
+        // --- HIỂN THỊ CÂU HỎI ---
+        function presentQuestion(difficulty, subjectFilter = null, isGamble = false) {
+            const result = getRandomQuestion(difficulty, subjectFilter);
+            
+            feedbackMessage.textContent = '';
+            nextTurnButton.classList.add('hidden');
+            optionsContainer.innerHTML = '';
+            
+            if (!result) {
+                modalSubject.textContent = "CHÚC MỪNG!";
+                modalQuestion.textContent = "Đã hết 120 câu hỏi! Ván đấu kết thúc. Xin mời xem Bảng Xếp Hạng.";
+                nextTurnButton.textContent = "KẾT THÚC VÁN ĐẤU";
+                questionModal.style.display = 'flex';
+                nextTurnButton.classList.remove('hidden');
+                return;
+            }
+
+            const { question, subject, difficulty: actualDifficulty } = result;
+            
+            let displayPoints = currentPoints;
+            let displayGamble = isGamble ? ' (CƯỢC ĐIỂM)' : '';
+            
+            modalSubject.textContent = `Chủ đề: ${subject} (${actualDifficulty} - ${displayPoints} ĐIỂM${displayGamble})`;
+            modalQuestion.textContent = question.q;
+            
+            const options = [
+                { key: 'A', text: question.a },
+                { key: 'B', text: question.b },
+                { key: 'C', text: question.c },
+                { key: 'D', text: question.d }
+            ];
+
+            options.forEach(option => {
+                const btn = document.createElement('button');
+                btn.className = 'option-button';
+                // Truyền isGamble vào handleAnswer
+                btn.onclick = () => handleAnswer(option.key, question.correct, btn, optionsContainer, actualDifficulty, isGamble);
+                btn.textContent = `${option.key}. ${option.text}`;
+                optionsContainer.appendChild(btn);
+            });
+
+            questionModal.style.display = 'flex';
+        }
+
+        // --- XỬ LÝ ĐÁP ÁN ---
+        function handleAnswer(selected, correct, selectedButton, optionsContainer, difficulty, isGamble = false) {
+            // Vô hiệu hóa tất cả các nút sau khi chọn
+            Array.from(optionsContainer.children).forEach(btn => btn.disabled = true);
+
+            const currentTeam = teams[activeTeamIndex];
+            let pointsEarned = 0; 
+            let feedbackDetails = "";
+
+            if (selected === correct) {
+                // --- TRẢ LỜI ĐÚNG ---
+                pointsEarned = currentPoints; 
+
+                if (isGamble) {
+                    // 1. Tìm đội có điểm cao nhất (không phải đội hiện tại)
+                    const sortedTeams = [...teams].sort((a, b) => b.score - a.score);
+                    let teamToStealFrom = null;
+
+                    if (sortedTeams.length > 1) {
+                         // Lấy đội cao nhất
+                        const highestScoringTeam = sortedTeams[0];
+                        
+                        // Nếu đội cao nhất KHÔNG phải đội hiện tại
+                        if (highestScoringTeam.id !== currentTeam.id) {
+                            teamToStealFrom = highestScoringTeam;
+                        } else if (sortedTeams.length > 1) {
+                            // Nếu đội hiện tại là đội cao nhất, cướp từ đội cao thứ 2
+                            teamToStealFrom = sortedTeams[1]; 
+                        }
+                    }
+
+                    // 2. Thực hiện logic cướp điểm và cộng điểm thưởng
+                    if (teamToStealFrom) {
+                        const targetTeamIndex = teams.findIndex(t => t.id === teamToStealFrom.id);
+                        teams[targetTeamIndex].score = Math.max(0, teams[targetTeamIndex].score - 10); // Đội bị cướp
+                        pointsEarned += 10; // +10 điểm thưởng cược
+                        currentTeam.score += 10; // +10 điểm cướp được
+                        feedbackDetails = `Bạn nhận thêm 10 Điểm Cược và CƯỚP thành công 10 Điểm từ ${teamToStealFrom.name}!`;
+                    } else {
+                        // Trường hợp chỉ có 1 đội hoặc các đội bằng điểm
+                        pointsEarned += 10; // +10 điểm thưởng cược
+                        feedbackDetails = "Bạn nhận thêm 10 Điểm Cược. (Không có đội khác để cướp).";
+                    }
+                }
+                
+                currentTeam.score += pointsEarned;
+                feedbackMessage.textContent = `CHÍNH XÁC! ${currentTeam.name} được cộng ${currentPoints + (isGamble ? 20 : 0)} điểm. ${feedbackDetails}`;
+                feedbackMessage.className = 'mt-4 text-center text-lg font-bold text-green-600';
+                selectedButton.style.backgroundColor = '#2ecc71'; // Xanh lá
+                selectedButton.style.color = 'white';
+
+            } else {
+                // --- TRẢ LỜI SAI ---
+                if (isGamble) {
+                    // Bị trừ 10 điểm
+                    currentTeam.score = Math.max(0, currentTeam.score - 10);
+                    feedbackDetails = "Trả lời sai! Đội của bạn bị trừ 10 điểm Đặt Cược.";
+                } else {
+                    feedbackDetails = "Trả lời sai. Đội của bạn bị MẤT LƯỢT.";
+                }
+
+                feedbackMessage.textContent = `SAI RỒI! Đáp án đúng là ${correct}. ${feedbackDetails}`;
+                feedbackMessage.className = 'mt-4 text-center text-lg font-bold text-red-600';
+                selectedButton.style.backgroundColor = '#e74c3c'; // Đỏ
+                selectedButton.style.color = 'white';
+
+                // Highlight đáp án đúng
+                Array.from(optionsContainer.children).forEach(btn => {
+                    if (btn.textContent.startsWith(correct)) {
+                        btn.style.backgroundColor = '#2ecc71';
+                        btn.style.color = 'white';
+                    }
+                });
+            }
+
+            // Cập nhật điểm và hiển thị nút chuyển lượt
+            renderLeaderboard(); 
+            nextTurnButton.classList.remove('hidden');
+        }
+
+        // --- CHUYỂN LƯỢT TIẾP THEO ---
+        window.moveToNextTurn = function() {
+            questionModal.style.display = 'none';
+            // Chuyển sang đội tiếp theo
+            activeTeamIndex = (activeTeamIndex + 1) % teams.length;
+            // Cập nhật lại Bảng Xếp Hạng
+            renderLeaderboard();
+            // Cho phép quay tiếp
+            spinButton.disabled = false; 
+        }
+
+        // Khởi tạo vòng quay và gán sự kiện
+        window.onload = () => {
+            drawWheel();
+            renderLeaderboard(); 
+
+            spinButton.addEventListener('click', spin);
+            
+            // Điều chỉnh vị trí kim chỉ khi canvas đã vẽ xong
+            const pointer = document.querySelector('.pointer');
+            // centerX = 275 (550/2). Offset = 275 + 15 (cho viền) = 290px
+            pointer.style.transform = `translate(-50%, 0%) translateY(-${centerX + 15}px) rotate(90deg)`;
+        };
+
+    </script>
+</body>
+</html>
